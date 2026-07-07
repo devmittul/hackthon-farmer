@@ -51,6 +51,7 @@ async def chat(
             session_id=payload.session_id,
             user_id=user_id,
             field_id=payload.field_id,        # ← Digital Twin field context
+            farm_id=payload.farm_id,           # ← Active farm context (geo)
         )
         return result
     except Exception as exc:

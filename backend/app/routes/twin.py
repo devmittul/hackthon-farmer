@@ -419,13 +419,26 @@ async def get_field_satellite(field_id: str, current_user: CurrentUser) -> dict:
     """
     user_id = current_user["_id"]
     field = await FieldProfileRepository.get(field_id, user_id)
+    is_new_field = False
     if not field:
+        field = None
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Field '{field_id}' not found.",
         )
 
-    centroid = field.get("centroid")
+    if is_new_field:
+        from app.utils.geo import polygon_centroid
+        poly = field.get("polygon", {})
+        coords = poly.get("coordinates", [])
+        centroid_dict = polygon_centroid(coords)
+        centroid = {
+            "latitude": centroid_dict.get("latitude") if centroid_dict else 20.5937,
+            "longitude": centroid_dict.get("longitude") if centroid_dict else 78.9629
+        }
+    else:
+        centroid = field.get("centroid")
+
     if not centroid:
         return success_response(
             data={"message": "No GPS centroid on record. Add lat/lon to enable satellite."},
@@ -438,7 +451,8 @@ async def get_field_satellite(field_id: str, current_user: CurrentUser) -> dict:
         sat = await get_ndvi(
             latitude=centroid["latitude"],
             longitude=centroid["longitude"],
-            location_name=field.get("name") or field_id,
+            location_name=field.get("fieldName") if is_new_field else (field.get("name") or field_id),
+            boundary=field.get("polygon") if is_new_field else None
         )
 
         if sat and sat.get("ndvi") is not None:
@@ -451,7 +465,29 @@ async def get_field_satellite(field_id: str, current_user: CurrentUser) -> dict:
                 "harvest_stage": sat.get("harvest_detection"),
                 "data_source": sat.get("data_source"),
             }
-            await FieldProfileRepository.update_satellite(field_id, snapshot)
+            if is_new_field:
+                from datetime import datetime, UTC
+                from bson import ObjectId
+                from app.database import get_collection
+                col = get_collection("fields")
+                db_id = ObjectId(field_id) if isinstance(field_id, str) and len(field_id) == 24 else field_id
+                await col.update_one(
+                    {"_id": db_id},
+                    {
+                        "$set": {
+                            "latest_satellite": snapshot,
+                            "updatedAt": datetime.now(UTC)
+                        },
+                        "$push": {
+                            "satellite_history": {
+                                "$each": [snapshot],
+                                "$slice": -24
+                            }
+                        }
+                    }
+                )
+            else:
+                await FieldProfileRepository.update_satellite(field_id, snapshot)
 
         return success_response(
             data=sat,

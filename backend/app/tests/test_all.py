@@ -24,8 +24,9 @@ def anyio_backend():
 
 @pytest_asyncio.fixture(scope="session")
 async def client():
-    from app.main import create_app
+    from app.main import create_app, _add_health_check
     app = create_app()
+    _add_health_check(app)
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as c:
@@ -284,26 +285,26 @@ class TestHealthEndpoint:
 @pytest.mark.asyncio
 class TestAuthEndpoints:
     async def test_register_missing_fields(self, client: AsyncClient):
-        response = await client.post("/auth/register", json={})
+        response = await client.post("/api/v1/auth/register", json={})
         assert response.status_code == 422  # Validation error
 
     async def test_login_missing_fields(self, client: AsyncClient):
-        response = await client.post("/auth/login", json={})
+        response = await client.post("/api/v1/auth/login", json={})
         assert response.status_code == 422
 
     async def test_me_without_token(self, client: AsyncClient):
-        response = await client.get("/auth/me")
+        response = await client.get("/api/v1/auth/me")
         assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 class TestChatEndpoint:
     async def test_chat_missing_message(self, client: AsyncClient):
-        response = await client.post("/chat", json={})
+        response = await client.post("/api/v1/chat", json={})
         assert response.status_code == 422
 
     async def test_chat_empty_message(self, client: AsyncClient):
-        response = await client.post("/chat", json={"message": ""})
+        response = await client.post("/api/v1/chat", json={"message": ""})
         assert response.status_code == 422
 
 
@@ -311,7 +312,7 @@ class TestChatEndpoint:
 class TestCropEndpoint:
     async def test_crop_predict_invalid_ph(self, client: AsyncClient):
         response = await client.post(
-            "/crop/predict",
+            "/api/v1/crop/predict",
             json={
                 "nitrogen": 50, "phosphorus": 50, "potassium": 50,
                 "temperature": 25, "humidity": 60, "ph": 20, "rainfall": 100
@@ -322,7 +323,7 @@ class TestCropEndpoint:
     async def test_crop_predict_valid_shape(self, client: AsyncClient):
         """Test that a valid request returns the expected response shape."""
         response = await client.post(
-            "/crop/predict",
+            "/api/v1/crop/predict",
             json={
                 "nitrogen": 90, "phosphorus": 42, "potassium": 43,
                 "temperature": 20.9, "humidity": 82, "ph": 6.5,
@@ -340,12 +341,12 @@ class TestCropEndpoint:
 @pytest.mark.asyncio
 class TestWeatherEndpoint:
     async def test_weather_missing_location(self, client: AsyncClient):
-        response = await client.post("/weather", json={})
+        response = await client.post("/api/v1/weather", json={})
         assert response.status_code == 422
 
     async def test_weather_invalid_days(self, client: AsyncClient):
         response = await client.post(
-            "/weather",
+            "/api/v1/weather",
             json={"location": "Mumbai", "days": 10}  # Max is 7
         )
         assert response.status_code == 422
@@ -354,12 +355,12 @@ class TestWeatherEndpoint:
 @pytest.mark.asyncio
 class TestSOSEndpoint:
     async def test_sos_missing_fields(self, client: AsyncClient):
-        response = await client.post("/sos", json={})
+        response = await client.post("/api/v1/sos", json={})
         assert response.status_code == 422
 
     async def test_sos_invalid_coordinates(self, client: AsyncClient):
         response = await client.post(
-            "/sos",
+            "/api/v1/sos",
             json={
                 "latitude": 200.0, "longitude": 72.5,
                 "description": "Test emergency"

@@ -50,6 +50,7 @@ async def orchestrate(
     session_id: Optional[str] = None,
     user_id: Optional[str] = None,
     field_id: Optional[str] = None,
+    farm_id: Optional[str] = None,
     extra_params: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
@@ -62,6 +63,7 @@ async def orchestrate(
         session_id:   Conversation session ID (auto-generated if None).
         user_id:      Authenticated user's MongoDB ObjectId string (optional).
         field_id:     Specific field to load into context (optional).
+        farm_id:      Active farm ID (takes priority over field for location).
         extra_params: Domain-specific parameters (NPK values, route origin, etc.)
 
     Returns:
@@ -95,6 +97,7 @@ async def orchestrate(
             location=location,
             user_id=user_id,
             field_id=field_id,
+            farm_id=farm_id,
             extra_params=extra_params or {},
         )
     except Exception as exc:
@@ -204,7 +207,12 @@ def _build_prompt(
             return prompt_builder.build_crop_prompt(
                 message, language, ctx.crop_prediction, input_params
             )
-        # No ML data — give agronomic general advice
+        # If we have farm/field context, use Digital Twin prompt!
+        if ctx and (ctx.field or ctx.farm):
+            return prompt_builder.build_digital_twin_prompt_from_context(
+                message, language, ctx
+            )
+        # No ML data and no farm context — give agronomic general advice
         return prompt_builder.build_chat_prompt(
             message, language,
             context={"domain": "crop_advice"},
@@ -261,10 +269,10 @@ def _build_prompt(
                      "location": ctx.location if ctx else None},
         )
 
-    # ── Default: general chat (or full Digital Twin if field is loaded) ───────
+    # ── Default: general chat (or full Digital Twin if field or farm is loaded) ───
     else:
-        # If a field is loaded → use the richest possible Digital Twin prompt
-        if ctx and ctx.field:
+        # If a field or farm is loaded → use the richest possible Digital Twin prompt
+        if ctx and (ctx.field or ctx.farm):
             return prompt_builder.build_digital_twin_prompt_from_context(
                 message, language, ctx
             )

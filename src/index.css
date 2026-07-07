@@ -4,74 +4,74 @@
 
 @layer base {
   :root {
-    --background: 45 40% 98%; /* Light earth brown tint / off-white */
-    --foreground: 120 20% 15%; /* Dark greenish grey */
+    /* Backgrounds: Cream, Off White, Warm Ivory */
+    --background: 40 33% 98%; /* Warm Ivory / Cream #FCFAF8 */
+    --foreground: 240 10% 20%; /* Soft Dark */
     
+    /* Cards: Pure White, Very Light Cream */
     --card: 0 0% 100%;
-    --card-foreground: 120 20% 15%;
+    --card-foreground: 240 10% 20%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 120 20% 15%;
+    --popover-foreground: 240 10% 20%;
     
-    /* Primary: Green */
-    --primary: 142 76% 36%;
-    --primary-foreground: 355 100% 100%;
+    /* Pastel Accents */
+    /* Sage Green */
+    --primary: 120 20% 70%;
+    --primary-foreground: 240 10% 20%;
     
-    /* Secondary: Light Earth Brown */
-    --secondary: 35 30% 90%;
-    --secondary-foreground: 24 10% 20%;
-    
-    --muted: 120 10% 94%;
-    --muted-foreground: 120 5% 45%;
-    
-    /* Accents */
-    --accent: 210 100% 50%; /* Blue */
-    --accent-foreground: 0 0% 100%;
-    
-    --destructive: 0 84% 60%; /* Red */
-    --destructive-foreground: 0 0% 100%;
-    
-    --warning: 38 92% 50%; /* Orange */
-    --warning-foreground: 0 0% 100%;
+    /* Soft Lavender */
+    --secondary: 260 40% 85%;
+    --secondary-foreground: 240 10% 20%;
 
-    --border: 120 15% 85%;
-    --input: 120 15% 85%;
-    --ring: 142 76% 36%;
+    /* Baby Blue */
+    --baby-blue: 210 60% 85%;
+    /* Blush Pink */
+    --blush-pink: 340 50% 85%;
+    /* Butter Yellow */
+    --butter-yellow: 45 80% 85%;
+    /* Muted Olive */
+    --muted-olive: 75 30% 70%;
+    /* Soft Peach */
+    --soft-peach: 20 60% 85%;
     
-    --radius: 0.75rem;
+    --muted: 40 20% 95%; /* Light Cream */
+    --muted-foreground: 240 5% 45%;
+    
+    --accent: 45 80% 85%;
+    --accent-foreground: 240 10% 20%;
+    
+    --destructive: 0 60% 85%;
+    --destructive-foreground: 240 10% 20%;
+    
+    --border: 40 20% 90%;
+    --input: 40 20% 90%;
+    --ring: 120 20% 70%;
+    
+    --radius: 1.5rem; /* 24px - 36px range requested */
   }
 
   .dark {
-    --background: 120 20% 10%;
-    --foreground: 45 40% 98%;
-    
-    --card: 120 20% 14%;
-    --card-foreground: 45 40% 98%;
-    
-    --popover: 120 20% 14%;
-    --popover-foreground: 45 40% 98%;
-    
-    --primary: 142 70% 45%;
-    --primary-foreground: 120 20% 10%;
-    
-    --secondary: 35 20% 20%;
-    --secondary-foreground: 45 40% 98%;
-    
-    --muted: 120 10% 20%;
-    --muted-foreground: 120 10% 70%;
-    
-    --accent: 210 90% 60%;
-    --accent-foreground: 120 20% 10%;
-    
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 45 40% 98%;
-    
-    --warning: 38 90% 50%;
-    --warning-foreground: 120 20% 10%;
-
-    --border: 120 15% 20%;
-    --input: 120 15% 20%;
-    --ring: 142 70% 45%;
+    /* Forcing light mode as per Apple Health style, but mapping dark variables to light just in case */
+    --background: 40 33% 98%; 
+    --foreground: 240 10% 20%; 
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 20%;
+    --primary: 120 20% 70%;
+    --primary-foreground: 240 10% 20%;
+    --secondary: 260 40% 85%;
+    --secondary-foreground: 240 10% 20%;
+    --muted: 40 20% 95%; 
+    --muted-foreground: 240 5% 45%;
+    --accent: 45 80% 85%;
+    --accent-foreground: 240 10% 20%;
+    --destructive: 0 60% 85%;
+    --destructive-foreground: 240 10% 20%;
+    --border: 40 20% 90%;
+    --input: 40 20% 90%;
+    --ring: 120 20% 70%;
   }
 }
 
@@ -85,10 +85,20 @@
   }
 }
 
-/* Custom utility classes */
 @layer utilities {
   .bg-farm-pattern {
-    background-image: radial-gradient(circle at 2px 2px, rgba(22, 163, 74, 0.1) 1px, transparent 0);
-    background-size: 32px 32px;
+    background-image: none;
+  }
+  
+  .glass {
+    @apply bg-white/90 backdrop-blur-xl border border-white/50;
+  }
+
+  .glass-card {
+    @apply bg-white border border-transparent shadow-[0_4px_24px_rgba(0,0,0,0.03)] rounded-[32px];
+  }
+
+  .text-gradient {
+    @apply text-foreground;
   }
 }

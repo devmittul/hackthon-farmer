@@ -110,6 +110,7 @@ class ContextBuilder:
         location: Optional[str] = None,
         user_id: Optional[str] = None,
         field_id: Optional[str] = None,
+        farm_id: Optional[str] = None,
         extra_params: Optional[Dict[str, Any]] = None,
     ) -> StructuredContext:
         """
@@ -123,6 +124,7 @@ class ContextBuilder:
             location:     Optional location string (place name or "lat,lon").
             user_id:      Authenticated user's MongoDB ObjectId string.
             field_id:     Optional specific field to load.
+            farm_id:      Optional specific farm (or loads active farm if omitted).
             extra_params: Domain-specific payload (crop NPK, route origin, etc.)
 
         Returns:
@@ -145,7 +147,7 @@ class ContextBuilder:
 
         # ── Run concurrent I/O fetches ────────────────────────────────────────
         tasks = [
-            cls._load_digital_twin(ctx, user_id, field_id),
+            cls._load_digital_twin(ctx, user_id, field_id, farm_id),
             cls._fetch_weather(ctx),
             cls._fetch_satellite(ctx),
             cls._fetch_market_prices(ctx),
@@ -169,14 +171,16 @@ class ContextBuilder:
         ctx: StructuredContext,
         user_id: Optional[str],
         field_id: Optional[str],
+        farm_id: Optional[str] = None,
     ) -> None:
-        """Load FarmerProfile, FarmProfile, FieldProfile from MongoDB."""
+        """Load FarmerProfile, FarmProfile (geo-aware), and FieldProfile from MongoDB."""
         if not user_id:
             ctx.data_sources["digital_twin"] = False
             return
 
         try:
             from app.database import get_collection
+            from app.repositories import FarmRepository
 
             # Farmer profile
             farmer_col = get_collection("farmer_profiles")
@@ -188,32 +192,94 @@ class ContextBuilder:
             else:
                 ctx.data_sources["farmer_profile"] = False
 
-            # If a specific field is requested, load it
-            if field_id:
-                field_col = get_collection("field_profiles")
-                field_doc = await field_col.find_one(
-                    {"field_id": field_id, "user_id": user_id}
-                )
-                if field_doc:
-                    field_doc.pop("_id", None)
-                    ctx.field = field_doc
-                    ctx.data_sources["field_profile"] = True
+            # ── Load farm (geo-aware, new system) ────────────────────────────
+            # Priority: explicit farm_id → active farm → most recent farm
+            farm_doc = None
+            if farm_id:
+                farm_doc = await FarmRepository.get(farm_id, user_id)
+            if not farm_doc:
+                farm_doc = await FarmRepository.get_any(user_id)
 
-                    # Also load the parent farm
-                    farm_id = field_doc.get("farm_id")
-                    if farm_id:
-                        farm_col = get_collection("farm_profiles")
-                        farm_doc = await farm_col.find_one(
-                            {"farm_id": farm_id, "user_id": user_id}
+            if farm_doc:
+                farm_doc.pop("_id", None)
+                ctx.farm = farm_doc
+                ctx.data_sources["farm_profile"] = True
+
+                # Derive location from farm center coordinate if no explicit location
+                center = farm_doc.get("center_coordinate") or {}
+                if center.get("latitude") and not ctx.location:
+                    ctx.location = f"{center['latitude']},{center['longitude']}"
+                    logger.debug(
+                        "ContextBuilder: derived location from farm center: %s", ctx.location
+                    )
+            else:
+                ctx.data_sources["farm_profile"] = False
+
+            # Validation fallback: if location is still not set and we have farmer profile
+            if not ctx.location and farmer_doc and farmer_doc.get("location"):
+                ctx.location = farmer_doc.get("location")
+                logger.debug(
+                    "ContextBuilder: derived location from farmer registered home location: %s", ctx.location
+                )
+
+            # ── Load specific field if requested ──────────────────────────────
+            if field_id:
+                fields_col = get_collection("fields")
+                from bson import ObjectId
+                field_doc = None
+                try:
+                    field_doc = await fields_col.find_one(
+                        {"_id": ObjectId(field_id), "ownerId": user_id}
+                    )
+                except Exception:
+                    pass
+                
+                if not field_doc:
+                    try:
+                        field_doc = await fields_col.find_one(
+                            {"_id": field_id, "ownerId": user_id}
                         )
-                        if farm_doc:
-                            farm_doc.pop("_id", None)
-                            ctx.farm = farm_doc
-                            ctx.data_sources["farm_profile"] = True
+                    except Exception:
+                        pass
+
+                if field_doc:
+                    centroid_data = None
+                    poly = field_doc.get("polygon") or {}
+                    coords = poly.get("coordinates")
+                    if coords:
+                        from app.utils.geo import polygon_centroid
+                        centroid_data = polygon_centroid(coords)
+                    
+                    ctx.field = {
+                        "field_id": str(field_doc["_id"]),
+                        "name": field_doc.get("fieldName"),
+                        "soil_ph": field_doc.get("soil_ph", 6.5),
+                        "nitrogen_kg_ha": field_doc.get("nitrogen_kg_ha", 40),
+                        "area_ha": field_doc.get("areaHectare", 1.0),
+                        "centroid": centroid_data or {"latitude": 0.0, "longitude": 0.0}
+                    }
+                    ctx.data_sources["field_profile"] = True
+                    if centroid_data and centroid_data.get("latitude"):
+                        ctx.location = f"{centroid_data['latitude']},{centroid_data['longitude']}"
+                else:
+                    # Fallback to legacy field_profiles
+                    field_col = get_collection("field_profiles")
+                    field_doc = await field_col.find_one(
+                        {"field_id": field_id, "user_id": user_id}
+                    )
+                    if field_doc:
+                        field_doc.pop("_id", None)
+                        ctx.field = field_doc
+                        ctx.data_sources["field_profile"] = True
+                        
+                        centroid = field_doc.get("centroid") or {}
+                        if centroid.get("latitude"):
+                            ctx.location = f"{centroid['latitude']},{centroid['longitude']}"
 
         except Exception as exc:
             logger.error("ContextBuilder: digital twin load error: %s", exc)
             ctx.data_sources["digital_twin"] = False
+
 
     @staticmethod
     async def _fetch_weather(ctx: StructuredContext) -> None:
@@ -245,14 +311,25 @@ class ContextBuilder:
 
     @staticmethod
     async def _fetch_satellite(ctx: StructuredContext) -> None:
-        """Fetch NDVI / crop health from GEE for the field location."""
+        """Fetch NDVI / crop health from GEE for the farm or field location."""
         lat, lon, name = None, None, "unknown"
+        boundary = None
 
-        if ctx.field:
+        if ctx.farm:
+            centroid = ctx.farm.get("center_coordinate") or {}
+            lat = centroid.get("latitude")
+            lon = centroid.get("longitude")
+            name = ctx.farm.get("name") or "farm"
+            boundary = ctx.farm.get("boundary")
+        elif ctx.field:
             centroid = ctx.field.get("centroid") or {}
             lat = centroid.get("latitude")
             lon = centroid.get("longitude")
             name = ctx.field.get("name") or ctx.location or "field"
+            # If the field has a polygon boundary, we can pass it
+            if hasattr(ctx, 'field') and ctx.field:
+                # wait, let's see if field_doc has polygon. Yes, but in ctx.field we loaded name, soil_ph, nitrogen_kg_ha, area_ha, centroid.
+                pass
         elif ctx.weather:
             lat = ctx.weather.get("latitude")
             lon = ctx.weather.get("longitude")
@@ -265,7 +342,7 @@ class ContextBuilder:
         try:
             from app.ai.satellite.service import get_ndvi
 
-            sat = await get_ndvi(lat, lon, location_name=name)
+            sat = await get_ndvi(lat, lon, location_name=name, boundary=boundary)
             if sat and sat.get("ndvi") is not None:
                 ctx.satellite = sat
                 ctx.data_sources["satellite"] = True
@@ -392,8 +469,9 @@ class ContextBuilder:
                 logger.error("ContextBuilder: vehicle ML error: %s", exc)
                 ctx.data_sources["ml_vehicle"] = False
 
-        # ── Advanced field intelligence (run when field + weather + satellite available)
-        if ctx.field and ctx.weather and ctx.satellite and ctx.satellite.get("ndvi") is not None:
+        # ── Advanced field/farm intelligence (run when field/farm + weather + satellite available)
+        target = ctx.field or ctx.farm
+        if target and ctx.weather and ctx.satellite and ctx.satellite.get("ndvi") is not None:
             ndvi = float(ctx.satellite.get("ndvi", 0.4))
             weather_cur = ctx.weather.get("current", {})
             weather_fc = ctx.weather.get("forecast", [{}])
@@ -407,15 +485,16 @@ class ContextBuilder:
             # Yield prediction
             try:
                 from app.ai.ml.models import predict_yield
+                area_ha = float(target.get("area_ha") or target.get("area_hectares") or 1.0)
                 yield_result = await asyncio.to_thread(
                     predict_yield,
                     ndvi=ndvi,
                     rainfall_mm=rainfall_7d,
                     temperature_c=temp,
-                    soil_ph=float(ctx.field.get("soil_ph") or 6.5),
-                    nitrogen_kg_ha=float(ctx.field.get("nitrogen_kg_ha") or 40),
+                    soil_ph=float(target.get("soil_ph") or 6.5),
+                    nitrogen_kg_ha=float(target.get("nitrogen_kg_ha") or 40),
                     humidity_pct=humidity,
-                    area_ha=float(ctx.field.get("area_ha") or 1.0),
+                    area_ha=area_ha,
                 )
                 ctx.extra["yield_prediction"] = yield_result
                 ctx.data_sources["ml_yield"] = True
@@ -447,7 +526,7 @@ class ContextBuilder:
                     rainfall_mm_7d=rainfall_7d,
                     temperature_c=temp,
                     humidity_pct=humidity,
-                    soil_type=str(ctx.field.get("soil_type") or "loamy"),
+                    soil_type=str(target.get("soil_type") or "loamy"),
                 )
                 ctx.extra["water_stress"] = water_result
                 ctx.data_sources["ml_water"] = True

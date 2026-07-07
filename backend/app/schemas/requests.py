@@ -86,6 +86,15 @@ class UserLoginRequest(BaseModel):
     password: str = Field(..., min_length=1)
 
 
+class UserProfileUpdateRequest(BaseModel):
+    """Payload to update user profile."""
+    name: Optional[str] = Field(default=None, min_length=2, max_length=100)
+    email: Optional[EmailStr] = Field(default=None)
+    phone: Optional[str] = Field(default=None, pattern=r"^\+?[1-9]\d{9,14}$")
+    location: Optional[str] = Field(default=None)
+    farm_size_acres: Optional[float] = Field(default=None, ge=0)
+
+
 class TokenResponse(BaseModel):
     """JWT token response."""
     access_token: str
@@ -102,6 +111,7 @@ class ChatRequest(BaseModel):
     location: Optional[str] = Field(default=None)
     session_id: Optional[str] = Field(default=None)
     field_id: Optional[str] = Field(default=None, description="Field Digital Twin ID for field-specific context")
+    farm_id: Optional[str] = Field(default=None, description="Active Farm ID — used to load full farm context")
 
     @field_validator("message")
     @classmethod
@@ -142,6 +152,17 @@ class CropPredictRequest(BaseModel):
     soil_type: Optional[SoilType] = Field(default=None)
     location: Optional[str] = Field(default=None)
     language: LanguageCode = Field(default=LanguageCode.EN)
+    # Optional: real question from user — used to personalise the AI explanation
+    user_question: Optional[str] = Field(
+        default=None,
+        max_length=500,
+        description="What the farmer actually wants to know — personalises the AI explanation",
+    )
+    crop_concern: Optional[str] = Field(
+        default=None,
+        max_length=200,
+        description="Specific concern (e.g. 'water scarcity', 'late season planting', 'export market')",
+    )
 
 
 class CropPredictResponse(BaseModel):

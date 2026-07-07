@@ -15,7 +15,8 @@ Each repository:
 
 Collections covered:
   FarmerProfileRepository  →  farmer_profiles
-  FarmProfileRepository    →  farm_profiles
+  FarmProfileRepository    →  farm_profiles (legacy)
+  FarmRepository           →  farms (new geo-aware, GeoJSON polygon support)
   FieldProfileRepository   →  field_profiles
 """
 from __future__ import annotations
@@ -330,3 +331,150 @@ class FieldProfileRepository:
             )
         except Exception as exc:
             logger.error("FieldProfileRepo.push_harvest_record: %s", exc)
+
+
+# ── Farm Repository (geo-aware, GeoJSON polygon) ──────────────────────────────
+
+class FarmRepository:
+    """
+    CRUD + geo operations for the 'farms' collection.
+
+    Each farm document stores:
+      - farm_id (UUID string)
+      - user_id (owner)
+      - name
+      - boundary (GeoJSON Polygon)
+      - center_coordinate {latitude, longitude}
+      - area_m2, area_acres, area_hectares
+      - village, district, state, country
+      - is_active (bool — only one farm per user can be active)
+      - created_at, updated_at
+
+    The 2dsphere index on 'boundary' enables geo queries.
+    """
+
+    _COL = "farms"
+
+    @classmethod
+    async def create(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Insert a new farm document and return it."""
+        try:
+            col = get_collection(cls._COL)
+            data.setdefault("created_at", datetime.now(UTC))
+            data.setdefault("updated_at", datetime.now(UTC))
+            data.setdefault("is_active", False)
+            result = await col.insert_one(data)
+            data["_id"] = str(result.inserted_id)
+            return data
+        except Exception as exc:
+            logger.error("FarmRepository.create: %s", exc)
+            raise
+
+    @classmethod
+    async def get(cls, farm_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Return a farm owned by user_id, or None."""
+        try:
+            col = get_collection(cls._COL)
+            doc = await col.find_one({"farm_id": farm_id, "user_id": user_id})
+            return _str_id(doc) if doc else None
+        except Exception as exc:
+            logger.error("FarmRepository.get: %s", exc)
+            return None
+
+    @classmethod
+    async def list_for_user(cls, user_id: str) -> List[Dict[str, Any]]:
+        """Return all farms owned by user_id, sorted by created_at desc."""
+        try:
+            col = get_collection(cls._COL)
+            cursor = col.find({"user_id": user_id}).sort("created_at", -1)
+            return [_str_id(doc) async for doc in cursor]
+        except Exception as exc:
+            logger.error("FarmRepository.list_for_user: %s", exc)
+            return []
+
+    @classmethod
+    async def update(
+        cls, farm_id: str, user_id: str, updates: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """PATCH a farm document. Returns updated doc or None."""
+        try:
+            col = get_collection(cls._COL)
+            updates["updated_at"] = datetime.now(UTC)
+            doc = await col.find_one_and_update(
+                {"farm_id": farm_id, "user_id": user_id},
+                {"$set": updates},
+                return_document=True,
+            )
+            return _str_id(doc) if doc else None
+        except Exception as exc:
+            logger.error("FarmRepository.update: %s", exc)
+            return None
+
+    @classmethod
+    async def delete(cls, farm_id: str, user_id: str) -> bool:
+        """Delete a farm. Returns True if deleted, False if not found."""
+        try:
+            col = get_collection(cls._COL)
+            result = await col.delete_one({"farm_id": farm_id, "user_id": user_id})
+            return result.deleted_count > 0
+        except Exception as exc:
+            logger.error("FarmRepository.delete: %s", exc)
+            return False
+
+    @classmethod
+    async def set_active(cls, user_id: str, farm_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Mark one farm as active for the user (atomic two-step):
+          1. Set is_active=False on ALL user farms
+          2. Set is_active=True on the chosen farm
+        Returns the newly activated farm document.
+        """
+        try:
+            col = get_collection(cls._COL)
+            # Deactivate all
+            await col.update_many(
+                {"user_id": user_id},
+                {"$set": {"is_active": False, "updated_at": datetime.now(UTC)}},
+            )
+            # Activate the chosen one
+            doc = await col.find_one_and_update(
+                {"farm_id": farm_id, "user_id": user_id},
+                {"$set": {"is_active": True, "updated_at": datetime.now(UTC)}},
+                return_document=True,
+            )
+            return _str_id(doc) if doc else None
+        except Exception as exc:
+            logger.error("FarmRepository.set_active: %s", exc)
+            return None
+
+    @classmethod
+    async def get_active(cls, user_id: str) -> Optional[Dict[str, Any]]:
+        """Return the currently active farm for user_id, or None."""
+        try:
+            col = get_collection(cls._COL)
+            doc = await col.find_one({"user_id": user_id, "is_active": True})
+            return _str_id(doc) if doc else None
+        except Exception as exc:
+            logger.error("FarmRepository.get_active: %s", exc)
+            return None
+
+    @classmethod
+    async def get_any(cls, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Return the active farm if one exists, otherwise the most recent farm.
+        Useful as a fallback when no farm is explicitly selected.
+        """
+        active = await cls.get_active(user_id)
+        if active:
+            return active
+        try:
+            col = get_collection(cls._COL)
+            doc = await col.find_one(
+                {"user_id": user_id},
+                sort=[("created_at", -1)],
+            )
+            return _str_id(doc) if doc else None
+        except Exception as exc:
+            logger.error("FarmRepository.get_any: %s", exc)
+            return None
+

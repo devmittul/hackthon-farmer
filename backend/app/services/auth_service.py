@@ -84,6 +84,8 @@ class AuthService:
                 "name": payload.name,
                 "email": payload.email,
                 "language": payload.language.value,
+                "phone": payload.phone,
+                "location": payload.location,
             },
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -129,6 +131,9 @@ class AuthService:
                 "name": user["name"],
                 "email": user["email"],
                 "language": user.get("language", "en"),
+                "phone": user.get("phone"),
+                "location": user.get("location"),
+                "farm_size_acres": user.get("farm_size_acres"),
             },
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -152,8 +157,62 @@ class AuthService:
             "id": str(user["_id"]),
             "name": user["name"],
             "email": user["email"],
-            "phone": user["phone"],
+            "phone": user.get("phone"),
             "language": user.get("language", "en"),
             "location": user.get("location"),
+            "farm_size_acres": user.get("farm_size_acres"),
             "created_at": user.get("created_at"),
+        }
+
+    @staticmethod
+    async def update_profile(user_id: str, payload: Any) -> dict[str, Any]:
+        """
+        Update user profile.
+        """
+        users = get_collection("users")
+        
+        # Convert payload to dict, excluding None values
+        updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+        
+        if not updates:
+            profile = await AuthService.get_profile(user_id)
+            if not profile:
+                raise ValueError("User not found.")
+            return profile
+
+        # If email is being updated, check if it's unique
+        if "email" in updates:
+            existing = await users.find_one({"email": updates["email"], "_id": {"$ne": ObjectId(user_id)}})
+            if existing:
+                raise ValueError("A user with this email already exists.")
+
+        # If language is being updated, also sync language preference collection
+        if "language" in updates:
+            lang_col = get_collection("language_preferences")
+            await lang_col.update_one(
+                {"user_id": user_id},
+                {"$set": {"language": updates["language"], "updated_at": datetime.now(UTC)}},
+                upsert=True,
+            )
+
+        updates["updated_at"] = datetime.now(UTC)
+        
+        result = await users.find_one_and_update(
+            {"_id": ObjectId(user_id)},
+            {"$set": updates},
+            return_document=True
+        )
+        
+        if not result:
+            raise ValueError("User not found.")
+            
+        return {
+            "id": str(result["_id"]),
+            "name": result["name"],
+            "email": result["email"],
+            "phone": result.get("phone"),
+            "language": result.get("language", "en"),
+            "location": result.get("location"),
+            "farm_size_acres": result.get("farm_size_acres"),
+            "created_at": result.get("created_at"),
         }

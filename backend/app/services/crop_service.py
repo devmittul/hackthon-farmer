@@ -103,11 +103,17 @@ class CropService:
 
         input_params = _build_input_params(payload)
 
-        # ── Step 2: Build structured prompt (facts → Reasoning Engine) ────────
-        user_question = (
-            "Based on my soil and climate conditions, what crop should I grow "
-            "and what are the best farming practices?"
+        # ── Step 2: Build contextual user question ────────────────────────────
+        # Use the real question from the frontend if provided;
+        # fall back to a rich context-aware question that includes location
+        # and any specific concern the farmer mentioned.
+        location_ctx = f" in {payload.location}" if payload.location else ""
+        concern_ctx = f" My main concern is: {payload.crop_concern}." if getattr(payload, 'crop_concern', None) else ""
+        user_question = getattr(payload, 'user_question', None) or (
+            f"Based on my soil and climate conditions{location_ctx}, "
+            f"what crop should I grow and what are the best farming practices?{concern_ctx}"
         )
+
         prompt = prompt_builder.build_crop_prompt(
             user_message=user_question,
             language=payload.language,
@@ -125,9 +131,6 @@ class CropService:
                 "AI explanation temporarily unavailable."
             )
             latency_ms = 0.0
-
-        # ── Step 4: Confidence ────────────────────────────────────────────────
-        confidence = ConfidenceEngine.compute_from_dict({"ml_crop": True})
 
         # ── Step 5: Persist ───────────────────────────────────────────────────
         tips = _extract_tips(explanation)

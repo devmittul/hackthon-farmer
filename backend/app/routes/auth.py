@@ -11,7 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import CurrentUser
-from app.schemas.requests import UserLoginRequest, UserRegisterRequest
+from app.schemas.requests import UserLoginRequest, UserRegisterRequest, UserProfileUpdateRequest
 from app.schemas.responses import error_response, success_response
 from app.services.auth_service import AuthService
 
@@ -89,3 +89,28 @@ async def get_me(current_user: CurrentUser) -> dict:
     if not profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
     return success_response(data=profile, message="Profile retrieved.")
+
+
+@router.put(
+    "/profile",
+    summary="Update current user profile",
+    response_description="Updated user profile",
+)
+async def update_profile(
+    payload: UserProfileUpdateRequest,
+    current_user: CurrentUser,
+) -> dict:
+    """
+    Update the authenticated user's profile information.
+    """
+    try:
+        updated_user = await AuthService.update_profile(current_user["_id"], payload)
+        return success_response(data=updated_user, message="Profile updated successfully.")
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Exception as exc:
+        logger.exception("Profile update error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update profile. Please try again.",
+        )

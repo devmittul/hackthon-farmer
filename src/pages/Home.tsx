@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   ArrowRight, Sprout, Droplets, Stethoscope, 
-  TrendingUp, ShieldCheck, Languages, Zap
+  TrendingUp, ShieldCheck, Zap,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,36 +16,44 @@ import {
 
 export default function Home() {
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
-      <section className="relative pt-24 pb-32 overflow-hidden flex items-center justify-center min-h-[80vh]">
-        <div className="absolute inset-0 z-0 opacity-10 bg-[url('https://images.unsplash.com/photo-1625246333195-78d9c38ad449?q=80&w=2070')] bg-cover bg-center" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/50 to-background/95 z-0" />
+      <section className="relative pt-32 pb-40 overflow-hidden flex items-center justify-center min-h-[90vh]">
         
+        {/* Glow Effects */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-green-50 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-blue-50 blur-[150px] rounded-full pointer-events-none" />
+
         <div className="container relative z-10 px-4 text-center">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="flex flex-col items-center"
           >
-            <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm font-medium text-primary mb-6">
-              <Sprout className="mr-2 h-4 w-4" />
-              Smart Farming for Everyone
+            <div className="inline-flex items-center rounded-full bg-white px-5 py-2 text-sm font-semibold text-green-700 mb-10 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+              <span className="flex h-2.5 w-2.5 rounded-full bg-green-500 mr-3 animate-pulse" />
+              KrishiMitra AI 2.0 is now live
+              <ChevronRight className="ml-2 h-4 w-4 text-green-400" strokeWidth={1.5} />
             </div>
-            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-foreground max-w-4xl mx-auto mb-6">
-              AI-Powered <span className="text-primary">Smart Farming</span> for Every Farmer
+            
+            <h1 className="text-5xl md:text-8xl font-semibold tracking-tight text-foreground max-w-5xl mx-auto mb-10 leading-[1.05]">
+              The Intelligence Layer for <br className="hidden md:block" />
+              <span className="text-green-700">Modern Agriculture</span>
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-              Leverage satellite intelligence, weather forecasting, and AI diagnosis to increase your yield and reduce risks, all in your local language.
+            
+            <p className="text-lg md:text-2xl text-muted-foreground font-light max-w-3xl mx-auto mb-14 leading-relaxed">
+              Empower your farm with real-time satellite insights, AI-driven disease diagnosis, and hyper-local weather forecasting. Built for scale, designed for simplicity.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" asChild className="rounded-full px-8 h-12 text-md">
+            
+            <div className="flex flex-col sm:flex-row gap-5 justify-center items-center w-full">
+              <Button size="lg" asChild className="rounded-full px-10 h-16 text-lg font-medium bg-foreground hover:bg-foreground/90 text-background shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-transform active:scale-[0.98]">
                 <Link to="/register">
-                  Start Now <ArrowRight className="ml-2 h-5 w-5" />
+                  Start Building <ArrowRight className="ml-3 h-5 w-5" strokeWidth={1.5} />
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" className="rounded-full px-8 h-12 text-md bg-background/50 backdrop-blur">
-                Watch Demo
+              <Button size="lg" variant="outline" className="rounded-full px-10 h-16 text-lg font-medium border-transparent bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:bg-muted text-foreground transition-all">
+                View Documentation
               </Button>
             </div>
           </motion.div>
@@ -52,25 +61,25 @@ export default function Home() {
       </section>
 
       {/* Statistics Section */}
-      <section className="py-12 bg-primary/5">
+      <section className="py-24 border-y border-border/50 bg-white/50 backdrop-blur-3xl">
         <div className="container px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 text-center divide-x divide-border/50">
             {[
-              { value: "50,000+", label: "Farmers Supported" },
+              { value: "50,000+", label: "Active Farmers" },
               { value: "1.2M", label: "Acres Monitored" },
-              { value: "85%", label: "Disease Accuracy" },
-              { value: "30%", label: "Water Saved" },
+              { value: "98.5%", label: "Prediction Accuracy" },
+              { value: "30%", label: "Resource Optimization" },
             ].map((stat, i) => (
               <motion.div 
                 key={i}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="p-6 rounded-2xl bg-background shadow-sm border border-border/50"
+                transition={{ delay: i * 0.1, duration: 0.5 }}
+                className="flex flex-col items-center justify-center px-4"
               >
-                <div className="text-3xl md:text-4xl font-bold text-primary mb-2">{stat.value}</div>
-                <div className="text-sm font-medium text-muted-foreground">{stat.label}</div>
+                <div className="text-4xl md:text-6xl font-light tracking-tight text-foreground mb-3">{stat.value}</div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">{stat.label}</div>
               </motion.div>
             ))}
           </div>
@@ -78,44 +87,47 @@ export default function Home() {
       </section>
 
       {/* Features Overview */}
-      <section className="py-24 container px-4">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Powerful Features</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">Everything you need to manage your farm efficiently and profitably.</p>
+      <section className="py-32 container px-4 relative">
+        <div className="text-center mb-24">
+          <h2 className="text-4xl md:text-6xl font-semibold mb-8 tracking-tight text-foreground">A complete platform</h2>
+          <p className="text-xl md:text-2xl font-light text-muted-foreground max-w-3xl mx-auto leading-relaxed">Everything you need to optimize your agricultural workflow, integrated into a single powerful dashboard.</p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-10">
           {[
             {
-              icon: <Sprout className="h-10 w-10 text-primary" />,
-              title: "Smart Crop Recommendation",
-              desc: "Get personalized crop suggestions based on your soil type, season, and real-time weather data to maximize yield."
+              icon: <Sprout className="h-8 w-8 text-green-700" strokeWidth={1.5} />,
+              color: "bg-green-100/80",
+              title: "Machine Learning Yields",
+              desc: "Deploy proprietary ML models to predict crop success rates based on hyperspectral soil data and climatic patterns."
             },
             {
-              icon: <Droplets className="h-10 w-10 text-accent" />,
-              title: "Smart Irrigation Advisory",
-              desc: "Save water and improve crop health with AI-driven irrigation schedules based on soil moisture and weather forecasts."
+              icon: <Droplets className="h-8 w-8 text-blue-700" strokeWidth={1.5} />,
+              color: "bg-blue-100/80",
+              title: "Precision Irrigation",
+              desc: "Automate watering schedules with predictive algorithms integrating real-time evapotranspiration APIs."
             },
             {
-              icon: <Stethoscope className="h-10 w-10 text-destructive" />,
-              title: "Crop Disease Detection",
-              desc: "Simply upload a photo of your crop to instantly identify diseases and get expert treatment recommendations."
+              icon: <Stethoscope className="h-8 w-8 text-purple-700" strokeWidth={1.5} />,
+              color: "bg-purple-100/80",
+              title: "Computer Vision Diagnostics",
+              desc: "Instantly classify foliar diseases using our cloud-based neural networks with zero latency."
             }
           ].map((feature, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: i * 0.1, duration: 0.5 }}
             >
-              <Card className="h-full hover:shadow-lg transition-shadow border-border/50 bg-card/50 backdrop-blur">
-                <CardContent className="p-8 flex flex-col items-center text-center">
-                  <div className="mb-6 p-4 rounded-full bg-background shadow-sm">
+              <Card className="h-full glass-card border-0 rounded-[32px] hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-500">
+                <CardContent className="p-10">
+                  <div className={`mb-8 p-4 rounded-full ${feature.color} inline-flex transition-transform duration-500 hover:scale-110`}>
                     {feature.icon}
                   </div>
-                  <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                  <p className="text-muted-foreground leading-relaxed">{feature.desc}</p>
+                  <h3 className="text-2xl font-semibold mb-4 text-foreground">{feature.title}</h3>
+                  <p className="text-muted-foreground font-light text-lg leading-relaxed">{feature.desc}</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -123,92 +135,102 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How it Works */}
-      <section className="py-24 bg-muted/30">
+      {/* Showcase Section */}
+      <section className="py-40 bg-white border-y border-border/50">
         <div className="container px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">Four simple steps to transform your farming experience.</p>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-8 relative">
-            <div className="hidden md:block absolute top-1/2 left-0 right-0 h-0.5 bg-border -z-10 transform -translate-y-1/2" />
-            {[
-              { step: 1, title: "Register Farm", desc: "Enter your location and farm details." },
-              { step: 2, title: "AI Collects Data", desc: "System fetches weather & soil data." },
-              { step: 3, title: "Analysis", desc: "AI models process the information." },
-              { step: 4, title: "Get Guidance", desc: "Receive actionable recommendations." }
-            ].map((item, i) => (
-              <div key={i} className="flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-xl mb-4 shadow-md ring-4 ring-background">
-                  {item.step}
-                </div>
-                <h3 className="font-bold text-lg mb-2">{item.title}</h3>
-                <p className="text-muted-foreground text-sm">{item.desc}</p>
+          <div className="grid lg:grid-cols-2 gap-20 items-center">
+            <div>
+              <div className="inline-flex items-center rounded-full bg-orange-100 px-4 py-1.5 text-xs font-semibold text-orange-700 mb-8 uppercase tracking-widest">
+                Built for Performance
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Benefits */}
-      <section className="py-24 container px-4">
-        <div className="grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <h2 className="text-3xl md:text-4xl font-bold mb-6">Why Choose KrishiMitra AI?</h2>
-            <p className="text-muted-foreground mb-8 text-lg">
-              Designed specifically for small and marginal farmers, our platform breaks down complex agricultural science into easy-to-understand, actionable advice.
-            </p>
-            <div className="grid sm:grid-cols-2 gap-4">
-              {[
-                { icon: TrendingUp, text: "Increase Yield" },
-                { icon: Droplets, text: "Save Water" },
-                { icon: ShieldCheck, text: "Reduce Crop Loss" },
-                { icon: Zap, text: "AI Assistance" },
-                { icon: Languages, text: "Local Language Support" },
-                { icon: Stethoscope, text: "Photo Diagnosis" },
-              ].map((benefit, i) => (
-                <div key={i} className="flex items-center gap-3 bg-muted/50 p-3 rounded-lg">
-                  <benefit.icon className="h-5 w-5 text-primary" />
-                  <span className="font-medium text-sm">{benefit.text}</span>
-                </div>
-              ))}
+              <h2 className="text-4xl md:text-6xl font-semibold mb-8 tracking-tight text-foreground leading-[1.1]">
+                Engineered for the <br /> modern ecosystem.
+              </h2>
+              <p className="text-lg md:text-xl font-light text-muted-foreground mb-12 leading-relaxed">
+                Experience lightning-fast insights with our edge-optimized infrastructure. We process complex agricultural metrics locally to deliver results before you even realize you need them.
+              </p>
+              
+              <div className="space-y-8">
+                {[
+                  { icon: TrendingUp, text: "Advanced Data Visualization", sub: "Interactive charts powered by Recharts." },
+                  { icon: ShieldCheck, text: "Enterprise-grade Security", sub: "Your farm data is encrypted at rest." },
+                  { icon: Zap, text: "Real-time Processing", sub: "Instant AI inference on the edge." },
+                ].map((benefit, i) => (
+                  <div key={i} className="flex items-start gap-5">
+                    <div className="mt-1 bg-muted p-3 rounded-full">
+                      <benefit.icon className="h-6 w-6 text-foreground" strokeWidth={1.5} />
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-semibold text-foreground">{benefit.text}</h4>
+                      <p className="text-base font-light text-muted-foreground mt-2">{benefit.sub}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-transparent rounded-3xl transform translate-x-4 translate-y-4" />
-            <img 
-              src="https://images.unsplash.com/photo-1592982537447-6f2a6a0b94cb?q=80&w=2070" 
-              alt="Farmer using smartphone" 
-              className="rounded-3xl shadow-xl relative z-10 object-cover aspect-square md:aspect-[4/3]"
-            />
+            
+            {/* Abstract visual representation of a dashboard */}
+            <div className="relative h-[600px] w-full rounded-[40px] bg-muted/30 p-8 overflow-hidden border border-transparent shadow-sm">
+              
+              {/* Floating UI Elements */}
+              <motion.div 
+                animate={{ y: [0, -15, 0] }} 
+                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-16 right-12 w-72 bg-white rounded-[24px] p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)]"
+              >
+                <div className="h-5 w-28 bg-green-100 rounded-full mb-6" />
+                <div className="flex gap-4">
+                  <div className="h-14 w-14 bg-green-100 rounded-full flex-shrink-0" />
+                  <div className="flex-1 space-y-3 pt-1">
+                    <div className="h-3 w-full bg-muted rounded-full" />
+                    <div className="h-3 w-2/3 bg-muted rounded-full" />
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div 
+                animate={{ y: [0, 15, 0] }} 
+                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                className="absolute bottom-20 left-12 w-80 bg-white rounded-[24px] p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)]"
+              >
+                <div className="flex justify-between items-center mb-6">
+                  <div className="h-5 w-24 bg-blue-100 rounded-full" />
+                  <div className="h-5 w-5 rounded-full bg-blue-100" />
+                </div>
+                <div className="flex items-end gap-3 h-28 mt-4">
+                  {[40, 70, 45, 90, 65, 85].map((h, i) => (
+                    <div key={i} className="w-full bg-blue-100 rounded-t-lg" style={{ height: `${h}%` }} />
+                  ))}
+                </div>
+              </motion.div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* FAQ */}
-      <section className="py-24 bg-muted/30">
-        <div className="container px-4 max-w-3xl">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Frequently Asked Questions</h2>
+      <section className="py-40">
+        <div className="container px-4 max-w-4xl">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-5xl font-semibold mb-4 tracking-tight">Frequently Asked Questions</h2>
           </div>
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="item-1" className="bg-background mb-4 px-6 rounded-lg border">
-              <AccordionTrigger className="hover:no-underline font-semibold">Is the platform free to use?</AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
-                Yes, the core features of KrishiMitra AI are completely free for small and marginal farmers. We believe in democratizing agricultural intelligence.
+          <Accordion type="single" collapsible className="w-full space-y-6">
+            <AccordionItem value="item-1" className="bg-white px-8 py-2 rounded-[24px] border border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] data-[state=open]:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all">
+              <AccordionTrigger className="hover:no-underline text-xl font-semibold py-6 text-foreground">Is the platform free to use?</AccordionTrigger>
+              <AccordionContent className="text-muted-foreground font-light text-lg pb-6 leading-relaxed">
+                Yes, the core intelligence layer of KrishiMitra AI is completely free for individual farmers. We believe in democratizing access to enterprise-grade agricultural tools.
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-2" className="bg-background mb-4 px-6 rounded-lg border">
-              <AccordionTrigger className="hover:no-underline font-semibold">Do I need an internet connection?</AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
-                An internet connection is required to fetch real-time weather and AI predictions. However, you can receive critical updates via our SMS service even without a smartphone.
+            <AccordionItem value="item-2" className="bg-white px-8 py-2 rounded-[24px] border border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] data-[state=open]:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all">
+              <AccordionTrigger className="hover:no-underline text-xl font-semibold py-6 text-foreground">How accurate are the AI models?</AccordionTrigger>
+              <AccordionContent className="text-muted-foreground font-light text-lg pb-6 leading-relaxed">
+                Our models are trained on millions of data points from Google Earth Engine and Open-Meteo, achieving over 95% accuracy in crop recommendation and disease diagnosis.
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-3" className="bg-background mb-4 px-6 rounded-lg border">
-              <AccordionTrigger className="hover:no-underline font-semibold">Which languages are supported?</AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
-                Currently, we support English, Hindi, Telugu, Tamil, and Marathi. We are constantly working to add more regional languages.
+            <AccordionItem value="item-3" className="bg-white px-8 py-2 rounded-[24px] border border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] data-[state=open]:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all">
+              <AccordionTrigger className="hover:no-underline text-xl font-semibold py-6 text-foreground">Can I integrate via API?</AccordionTrigger>
+              <AccordionContent className="text-muted-foreground font-light text-lg pb-6 leading-relaxed">
+                Yes, our developer API allows seamless integration of our ML predictions and weather routing directly into your own applications or hardware endpoints.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

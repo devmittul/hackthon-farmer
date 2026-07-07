@@ -89,12 +89,16 @@ COLLECTIONS = {
     "weather_cache": "weather_cache",
     "satellite_data": "satellite_data",
     "language_preferences": "language_preferences",
-    # ── Digital Twin collections ───────────────────────────────────────────────
+    # ── Digital Twin collections (legacy) ─────────────────────────────────────
     "farmer_profiles": "farmer_profiles",
     "farm_profiles": "farm_profiles",
     "field_profiles": "field_profiles",
+    # ── Farm Management (geo-aware, Phase 1) ──────────────────────────────────
+    "farms": "farms",
     # ── Market cache ──────────────────────────────────────────────────────────
     "market_prices": "market_prices",
+    # ── Field Mapping ─────────────────────────────────────────────────────────
+    "fields": "fields",
 }
 
 

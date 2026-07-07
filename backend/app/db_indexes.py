@@ -152,6 +152,26 @@ INDEXES: Dict[str, List[IndexModel]] = {
                    expireAfterSeconds=86_400,
                    name="ttl_market_24h"),
     ],
+
+    # ── Farms – geo-aware polygon collection (Phase 1) ────────────────────────
+    "farms": [
+        IndexModel([("farm_id", ASCENDING)], unique=True, name="unique_farm_id"),
+        IndexModel([("user_id", ASCENDING)], name="idx_user_id"),
+        IndexModel([("user_id", ASCENDING), ("is_active", ASCENDING)],
+                   name="idx_user_active"),
+        IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)],
+                   name="idx_user_created"),
+        # 2dsphere index enables geospatial queries on the polygon boundary
+        IndexModel([("boundary", "2dsphere")], name="idx_boundary_geo"),
+    ],
+
+    # ── Fields – geo-aware polygon collection (Phase 2) ───────────────────────
+    "fields": [
+        IndexModel([("ownerId", ASCENDING), ("createdAt", DESCENDING)],
+                   name="idx_owner_created"),
+        IndexModel([("ownerId", ASCENDING), ("fieldName", ASCENDING)],
+                   name="idx_owner_fieldname"),
+    ],
 }
 
 

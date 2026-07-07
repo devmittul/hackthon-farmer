@@ -14,6 +14,14 @@ import DiseaseDiagnosis from '@/pages/DiseaseDiagnosis';
 import Reports from '@/pages/Reports';
 import Profile from '@/pages/Profile';
 import Placeholder from '@/pages/Placeholder';
+import Features from '@/pages/Features';
+import About from '@/pages/About';
+import Contact from '@/pages/Contact';
+
+import FieldMapping from '@/pages/FieldMapping';
+import SatelliteAnalysis from '@/pages/SatelliteAnalysis';
+import CropHealth from '@/pages/CropHealth';
+import FieldHistory from '@/pages/FieldHistory';
 
 function App() {
   const { refreshUser } = useAppStore();
@@ -28,9 +36,9 @@ function App() {
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<Home />} />
-          <Route path="/features" element={<Placeholder />} />
-          <Route path="/about" element={<Placeholder />} />
-          <Route path="/contact" element={<Placeholder />} />
+          <Route path="/features" element={<Features />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="*" element={<Placeholder />} />
         </Route>
 
@@ -41,10 +49,14 @@ function App() {
         {/* Dashboard pages */}
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<Dashboard />} />
+          <Route path="field-mapping" element={<FieldMapping />} />
+          <Route path="satellite-analysis" element={<SatelliteAnalysis />} />
+          <Route path="crop-health" element={<CropHealth />} />
           <Route path="crop" element={<CropRecommendation />} />
           <Route path="irrigation" element={<Irrigation />} />
           <Route path="disease" element={<DiseaseDiagnosis />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="field-history" element={<FieldHistory />} />
           <Route path="profile" element={<Profile />} />
         </Route>
       </Routes>

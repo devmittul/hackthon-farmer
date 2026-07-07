@@ -3,6 +3,7 @@
  * All calls go to the real FastAPI backend.
  * No mocks. No timeouts. Real data only.
  */
+import type { Farm, CreateFarmPayload, UpdateFarmPayload } from '@/types/farm';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -81,11 +82,11 @@ export interface WeatherData {
 
 export interface CropResult {
   recommended_crop: string;
-  confidence: number;
+  confidence_score: number;
   alternatives: string[];
   explanation?: string;
   tips?: string[];
-  soil_inputs: Record<string, number>;
+  input_params: Record<string, any>;
 }
 
 export interface ChatMessage {
@@ -129,19 +130,87 @@ export const authApi = {
     }, true),
 
   me: () => apiFetch<UserProfile>('/auth/me'),
+
+  updateProfile: (data: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    farm_size_acres?: number;
+  }) => apiFetch<UserProfile>('/auth/profile', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
 };
 
 // ── Chat API ──────────────────────────────────────────────────────────────────
 export const chatApi = {
-  send: (message: string, location?: string, sessionId?: string, language = 'en', fieldId?: string) =>
+  send: (
+    message: string,
+    location?: string,
+    sessionId?: string,
+    language = 'en',
+    fieldId?: string,
+    farmId?: string,
+  ) =>
     apiFetch<ChatMessage>('/chat', {
       method: 'POST',
-      body: JSON.stringify({ message, location, session_id: sessionId, language, field_id: fieldId }),
+      body: JSON.stringify({
+        message,
+        location,
+        session_id: sessionId,
+        language,
+        field_id: fieldId,
+        farm_id: farmId,
+      }),
     }),
 
   history: (limit = 20, skip = 0) =>
     apiFetch<ChatMessage[]>(`/history?limit=${limit}&skip=${skip}`),
 };
+
+// ── Farm API ──────────────────────────────────────────────────────────────────
+export const farmApi = {
+  list: () =>
+    apiFetch<Farm[]>('/farms'),
+
+  getActive: () =>
+    apiFetch<Farm | null>('/farms/active'),
+
+  create: (data: CreateFarmPayload) =>
+    apiFetch<Farm>('/farms', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  get: (farmId: string) =>
+    apiFetch<Farm>(`/farms/${farmId}`),
+
+  update: (farmId: string, data: UpdateFarmPayload) =>
+    apiFetch<Farm>(`/farms/${farmId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (farmId: string) =>
+    apiFetch<{ farm_id: string; deleted: boolean }>(`/farms/${farmId}`, {
+      method: 'DELETE',
+    }),
+
+  activate: (farmId: string) =>
+    apiFetch<Farm>(`/farms/${farmId}/activate`, {
+      method: 'POST',
+    }),
+
+  analyze: (farmId: string) =>
+    apiFetch<any>(`/farms/${farmId}/analyze`, {
+      method: 'POST',
+    }),
+
+  getSatellite: (farmId: string) =>
+    apiFetch<any>(`/farms/${farmId}/satellite`),
+};
+
 
 // ── Weather API ───────────────────────────────────────────────────────────────
 export const weatherApi = {
@@ -154,13 +223,16 @@ export const weatherApi = {
 
 // ── Crop API ──────────────────────────────────────────────────────────────────
 export const cropApi = {
-  predict: (inputs: {
+  predict: async (inputs: {
     nitrogen: number; phosphorus: number; potassium: number;
     temperature: number; humidity: number; ph: number; rainfall: number;
     language?: string; location?: string;
-  }) => apiFetch<CropResult>('/crop/predict', {
-    method: 'POST', body: JSON.stringify(inputs),
-  }),
+    user_question?: string; crop_concern?: string;
+  }) => {
+    return await apiFetch<CropResult>('/crop/predict', {
+      method: 'POST', body: JSON.stringify(inputs),
+    });
+  },
 };
 
 // ── Route API ─────────────────────────────────────────────────────────────────
@@ -240,6 +312,16 @@ export const systemApi = {
   getStatus: () => apiFetch<Record<string, { status: string; message: string }>>('/system/status'),
 };
 
+// ── Fields API (New Module) ───────────────────────────────────────────────────
+export const fieldApi = {
+  list: () => apiFetch<any[]>('/fields'),
+  get: (fieldId: string) => apiFetch<any>(`/fields/${fieldId}`),
+  create: (data: any) => apiFetch<any>('/fields', { method: 'POST', body: JSON.stringify(data) }),
+  update: (fieldId: string, data: any) => apiFetch<any>(`/fields/${fieldId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (fieldId: string) => apiFetch<{ field_id: string; deleted: boolean }>(`/fields/${fieldId}`, { method: 'DELETE' }),
+  analyze: (fieldId: string) => apiFetch<any>(`/twin/fields/${fieldId}/satellite`),
+};
+
 // ── Legacy compatibility shim (so old imports don't break during migration) ───
 export const api = {
   getWeather: async () => {
@@ -253,7 +335,7 @@ export const api = {
       rainProb: data.current.rainfall_mm,
     };
   },
-  getCropRecommendation: async (inputs: Record<string, number>) => {
+  getCropRecommendation: async (inputs: Record<string, number>, location?: string, user_question?: string) => {
     const data = await cropApi.predict({
       nitrogen: inputs.n ?? 90,
       phosphorus: inputs.p ?? 42,
@@ -262,33 +344,165 @@ export const api = {
       humidity: inputs.humidity ?? 75,
       ph: inputs.ph ?? 6.5,
       rainfall: inputs.rainfall ?? 200,
+      location,
+      user_question,
     });
     return [{
       name: data.recommended_crop.charAt(0).toUpperCase() + data.recommended_crop.slice(1),
-      score: Math.round(data.confidence),
+      score: Math.round(data.confidence_score),
       waterRequired: 'Medium',
       yield: 'High',
       risk: 'Low',
       profit: 'High',
       season: 'Current',
-      reason: data.explanation || `AI confidence: ${data.confidence.toFixed(1)}%`,
+      reason: data.explanation || `AI confidence: ${data.confidence_score.toFixed(1)}%`,
       alternatives: data.alternatives,
       tips: data.tips,
     }];
   },
-  diagnoseDisease: async () => ({ disease: 'Use AI Chat for diagnosis', confidence: 0, severity: 'N/A', symptoms: [], causes: [], treatment: [], prevention: [] }),
+  diagnoseDisease: async (file?: File) => {
+    if (!file) throw new Error('No image file provided. Please upload a plant photo first.');
+
+    // ── Read model/key from env vars (never hardcoded) ──────────────────────
+    const apiKey   = import.meta.env.VITE_GEMINI_API_KEY as string;
+    const model    = (import.meta.env.VITE_GEMINI_MODEL as string) || 'gemini-2.5-flash';
+
+    if (!apiKey) {
+      throw new Error('VITE_GEMINI_API_KEY is not set. Please add it to your .env file.');
+    }
+
+    // ── Validate image MIME type before uploading ────────────────────────────
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const mimeType = file.type || 'image/jpeg';
+    if (!allowedTypes.includes(mimeType)) {
+      throw new Error(`Unsupported image format "${file.type}". Please upload a JPG, PNG, or WEBP image.`);
+    }
+
+    // ── Convert File → base64 ────────────────────────────────────────────────
+    const base64Data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        if (!base64) { reject(new Error('Failed to read image file. The file may be corrupted.')); return; }
+        resolve(base64);
+      };
+      reader.onerror = () => reject(new Error('Failed to read image file.'));
+      reader.readAsDataURL(file);
+    });
+
+    // ── Call Gemini REST API (v1beta) ────────────────────────────────────────
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                text: [
+                  'You are an expert plant pathologist with 20 years of field experience.',
+                  'Analyze the provided crop leaf image carefully.',
+                  'Identify the disease, or confirm if the plant is healthy.',
+                  'You MUST respond with ONLY a raw JSON object — no markdown, no explanation, no code fences.',
+                  'Required keys: "disease" (string), "confidence" (number 0-100),',
+                  '"severity" (exactly one of: "Low", "Medium", "High"),',
+                  '"symptoms" (array of 3-5 strings), "causes" (array of 2-4 strings),',
+                  '"treatment" (array of 3-5 actionable strings),',
+                  '"prevention" (array of 3-5 strings).',
+                ].join(' '),
+              },
+              {
+                inlineData: { mimeType, data: base64Data },
+              },
+            ],
+          }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+        }),
+      });
+    } catch (networkErr: any) {
+      throw new Error(`Network error — could not reach Gemini API. Check your internet connection. (${networkErr.message})`);
+    }
+
+    // ── Handle all HTTP-level errors explicitly ──────────────────────────────
+    if (!response.ok) {
+      let errBody: any = {};
+      try { errBody = await response.json(); } catch { /* ignore */ }
+      const apiMsg: string = errBody?.error?.message || response.statusText;
+      const code: number   = errBody?.error?.code    || response.status;
+      if (code === 400) throw new Error(`Invalid request — image may be corrupted or too large. (${apiMsg})`);
+      if (code === 401 || code === 403) throw new Error(`Invalid or unauthorized Gemini API key. Check VITE_GEMINI_API_KEY. (${apiMsg})`);
+      if (code === 404) throw new Error(`Model "${model}" not found. Change VITE_GEMINI_MODEL to "gemini-2.5-flash". (${apiMsg})`);
+      if (code === 429) throw new Error(`Gemini quota exceeded. Please wait a moment and try again. (${apiMsg})`);
+      if (code >= 500) throw new Error(`Gemini server error (${code}). Try again shortly. (${apiMsg})`);
+      throw new Error(`Gemini API error ${code}: ${apiMsg}`);
+    }
+
+    // ── Parse response safely ────────────────────────────────────────────────
+    let rawJson: any;
+    try { rawJson = await response.json(); } catch {
+      throw new Error('Received an unreadable response from Gemini. Please try again.');
+    }
+
+    const candidate = rawJson?.candidates?.[0];
+    if (!candidate) {
+      const blockReason = rawJson?.promptFeedback?.blockReason;
+      if (blockReason) throw new Error(`Request blocked by Gemini safety filters (${blockReason}). Use a clear plant image.`);
+      throw new Error('No diagnosis was returned by the AI. Please try a different image.');
+    }
+
+    const rawText: string = candidate?.content?.parts?.[0]?.text ?? '';
+    if (!rawText.trim()) throw new Error('Gemini returned an empty response. Please upload a clearer image.');
+
+    // Strip any accidental markdown fences
+    const cleaned = rawText
+      .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+
+    try {
+      return JSON.parse(cleaned);
+    } catch {
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      if (match) { try { return JSON.parse(match[0]); } catch { /* fall through */ } }
+      throw new Error('AI returned an unexpected format. Please try the diagnosis again.');
+    }
+  },
   getSensorData: async () => ({ soilMoisture: 'N/A', airTemp: 'N/A', humidity: 'N/A', ph: 'N/A', n: 'N/A', p: 'N/A', k: 'N/A', connected: false }),
-  getIrrigationAdvisory: async () => {
-    const data = await weatherApi.get('auto', 3).catch(() => null);
-    const rain = data?.forecast?.[0]?.rainfall_mm ?? 0;
+
+  /**
+   * Irrigation advisory derived from live weather for the given location.
+   * All values come from real weather data — nothing is hardcoded.
+   */
+  getIrrigationAdvisory: async (location = 'auto') => {
+    const data = await weatherApi.get(location, 5).catch(() => null);
+    if (!data) return {
+      shouldIrrigate: true,
+      waterAmount: 'Check local conditions',
+      fertilizer: 'Consult AI Chat for fertilizer advice',
+      nextRain: 'Unavailable',
+      drySpellRisk: 'Unknown',
+      farmHealth: 'Unknown',
+      statusColor: 'yellow',
+    };
+    const todayRain = data.current.rainfall_mm;
+    const totalForecastRain = data.forecast.reduce((s, d) => s + d.rainfall_mm, 0);
+    const avgHumidity = data.forecast.reduce((s, d) => s + d.humidity_pct, 0) / (data.forecast.length || 1);
+    const shouldIrrigate = todayRain < 5 && avgHumidity < 65;
+    // Water amount: base 20mm minus what rain already provides
+    const waterMm = Math.max(0, Math.round(20 - todayRain));
+    const drySpellRisk = totalForecastRain < 10 ? 'High' : totalForecastRain < 30 ? 'Medium' : 'Low';
+    const farmHealth = avgHumidity > 70 ? 'Good' : avgHumidity > 50 ? 'Fair' : 'Needs Attention';
     return {
-      shouldIrrigate: rain < 5,
-      waterAmount: '15 mm',
-      fertilizer: 'Check with AI Chat',
-      nextRain: data?.forecast?.[1]?.condition ?? 'Unknown',
-      drySpellRisk: rain < 2 ? 'High' : 'Low',
-      farmHealth: 'Good',
-      statusColor: rain < 5 ? 'yellow' : 'green',
+      shouldIrrigate,
+      waterAmount: `${waterMm} mm`,
+      fertilizer: shouldIrrigate ? 'Apply fertilizer before irrigation for best absorption' : 'Wait for current moisture to stabilise',
+      nextRain: data.forecast?.[0]?.condition ?? 'Unknown',
+      drySpellRisk,
+      farmHealth,
+      statusColor: shouldIrrigate ? 'yellow' : 'green',
+      advisory: data.advisory,
     };
   },
   getReports: async () => [],

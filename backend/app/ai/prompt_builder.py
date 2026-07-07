@@ -308,11 +308,12 @@ def build_field_intelligence_prompt(
     disease_risk: Optional[dict[str, Any]] = None,
     water_stress: Optional[dict[str, Any]] = None,
     recent_chat: Optional[list] = None,
+    farm: Optional[dict[str, Any]] = None,
 ) -> str:
     """
     Full Digital Twin context prompt.
 
-    Injects farmer identity, field profile, weather, satellite NDVI,
+    Injects farmer identity, farm & field profile, weather, satellite NDVI,
     yield prediction, disease risk, and water stress into a single
     structured prompt for comprehensive field-specific responses.
     """
@@ -328,6 +329,22 @@ Language: {farmer.get("preferred_language", "en")}
 District: {farmer.get("district", "Unknown")}
 State: {farmer.get("state", "Unknown")}
 Primary Crops: {", ".join(farmer.get("primary_crops", [])) or "Not specified"}
+"""
+
+    # ── Farm block ────────────────────────────────────────────────────────────
+    farm_block = ""
+    if farm:
+        location_parts = [
+            f"Village {farm.get('village')}" if farm.get("village") else "",
+            f"District {farm.get('district')}" if farm.get("district") else "",
+            farm.get("state") or "",
+            farm.get("country") or "",
+        ]
+        location_str = ", ".join([p for p in location_parts if p]) or "Unknown"
+        farm_block = f"""
+## Farm Profile
+Farm Name: {farm.get("name", "Unknown")} | Area: {farm.get("area_acres", "?")} acres
+Location: {location_str}
 """
 
     # ── Field block ───────────────────────────────────────────────────────────
@@ -408,7 +425,7 @@ Recommendation: {water_stress.get("recommendation", "")}
         history_block = f"\n## Recent Conversation\n{history_lines}\n"
 
     return f"""{_system_prompt(language)}
-{farmer_block}{field_block}{weather_block}{satellite_block}{intelligence_block}{history_block}
+{farmer_block}{farm_block}{field_block}{weather_block}{satellite_block}{intelligence_block}{history_block}
 ## Farmer's Question
 {user_message}
 
@@ -418,11 +435,11 @@ Recommendation: {water_stress.get("recommendation", "")}
 3. If yield is below_average or poor, explain why based on the data.
 4. If disease risk is MODERATE or above, emphasise the preventive actions.
 5. If water stress requires immediate irrigation, make this the first recommendation.
-6. Reference the specific field name and crop where relevant.
+6. Reference the specific field/farm name and crop where relevant.
 7. Keep the response actionable and practical for a smallholder farmer.
 
 ## Expected Output
-A personalised, field-specific advisory in {lang_name}. Be concise. Use bullet points.
+A personalised, field/farm-specific advisory in {lang_name}. Be concise. Use bullet points.
 """
 
 
@@ -455,5 +472,6 @@ def build_digital_twin_prompt_from_context(
         disease_risk=ctx.extra.get("disease_risk") if hasattr(ctx, "extra") else None,
         water_stress=ctx.extra.get("water_stress") if hasattr(ctx, "extra") else None,
         recent_chat=getattr(ctx, "recent_chat", None),
+        farm=getattr(ctx, "farm", None),
     )
 

@@ -60,6 +60,7 @@ async def get_ndvi(
     longitude: float,
     location_name: str = "unknown",
     radius_km: float = 2.0,
+    boundary: Optional[dict[str, Any]] = None,
 ) -> Optional[dict[str, Any]]:
     """
     Calculate NDVI and crop health metrics for a given location.
@@ -69,6 +70,7 @@ async def get_ndvi(
         longitude: Location longitude.
         location_name: Human-readable name for caching key.
         radius_km: Buffer radius around the point.
+        boundary: Optional GeoJSON Polygon dict for precise field analysis.
 
     Returns:
         Dict with NDVI, crop health, and vegetation index, or None.
@@ -95,16 +97,20 @@ async def get_ndvi(
             return cached["result_data"]
 
         # Define area of interest
-        point = ee.Geometry.Point([longitude, latitude])
-        aoi = point.buffer(radius_km * 1000)  # metres
+        if boundary and boundary.get("type") == "Polygon":
+            aoi = ee.Geometry.Polygon(boundary["coordinates"])
+        else:
+            point = ee.Geometry.Point([longitude, latitude])
+            aoi = point.buffer(radius_km * 1000)  # metres
 
         # Use Sentinel-2 Surface Reflectance (free, 10m resolution)
+        now_str = datetime.now(UTC).isoformat()
         sentinel2 = (
             ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
             .filterBounds(aoi)
             .filterDate(
-                ee.Date.now().advance(-30, "day"),
-                ee.Date.now(),
+                ee.Date(now_str).advance(-30, "day"),
+                ee.Date(now_str),
             )
             .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
             .sort("CLOUDY_PIXEL_PERCENTAGE")
@@ -118,7 +124,21 @@ async def get_ndvi(
         # NDVI = (NIR - Red) / (NIR + Red)
         ndvi_image = sentinel2.normalizedDifference(["B8", "B4"]).rename("NDVI")
 
-        ndvi_stats = ndvi_image.reduceRegion(
+        # NDWI = (Green - NIR) / (Green + NIR)
+        ndwi_image = sentinel2.normalizedDifference(["B3", "B8"]).rename("NDWI")
+
+        # EVI = 2.5 * ((NIR - Red) / (NIR + 6 * Red - 7.5 * Blue + 1))
+        evi_image = sentinel2.expression(
+            '2.5 * ((NIR - RED) / (NIR + 6.0 * RED - 7.5 * BLUE + 1.0))', {
+                'NIR': sentinel2.select('B8'),
+                'RED': sentinel2.select('B4'),
+                'BLUE': sentinel2.select('B2')
+            }
+        ).rename("EVI")
+
+        combined_image = ndvi_image.addBands(ndwi_image).addBands(evi_image)
+
+        stats = combined_image.reduceRegion(
             reducer=ee.Reducer.mean().combine(
                 reducer2=ee.Reducer.minMax(),
                 sharedInputs=True,
@@ -128,12 +148,24 @@ async def get_ndvi(
             maxPixels=1e8,
         ).getInfo()
 
-        ndvi_mean = ndvi_stats.get("NDVI_mean", 0.0)
-        ndvi_min = ndvi_stats.get("NDVI_min", 0.0)
-        ndvi_max = ndvi_stats.get("NDVI_max", 0.0)
+        ndvi_mean = stats.get("NDVI_mean") or 0.0
+        ndvi_min = stats.get("NDVI_min") or 0.0
+        ndvi_max = stats.get("NDVI_max") or 0.0
 
-        # Interpret NDVI
+        ndwi_mean = stats.get("NDWI_mean") or 0.0
+        ndwi_min = stats.get("NDWI_min") or 0.0
+        ndwi_max = stats.get("NDWI_max") or 0.0
+
+        evi_mean = stats.get("EVI_mean") or 0.0
+        evi_min = stats.get("EVI_min") or 0.0
+        evi_max = stats.get("EVI_max") or 0.0
+
+        # Calculate Area Statistics in square meters
+        gee_area = aoi.area(maxError=1).getInfo()
+
+        # Interpret NDVI / EVI for health
         crop_health = _interpret_ndvi(ndvi_mean)
+        vegetation_health = f"{crop_health} (EVI: {evi_mean:.2f})"
         harvest_detection = _detect_harvest_stage(ndvi_mean)
 
         result: dict[str, Any] = {
@@ -143,9 +175,21 @@ async def get_ndvi(
             "ndvi": round(float(ndvi_mean), 4),
             "ndvi_min": round(float(ndvi_min), 4),
             "ndvi_max": round(float(ndvi_max), 4),
+            "ndwi": round(float(ndwi_mean), 4),
+            "ndwi_min": round(float(ndwi_min), 4),
+            "ndwi_max": round(float(ndwi_max), 4),
+            "evi": round(float(evi_mean), 4),
+            "evi_min": round(float(evi_min), 4),
+            "evi_max": round(float(evi_max), 4),
             "crop_health": crop_health,
+            "vegetation_health": vegetation_health,
             "vegetation_index": round(float(ndvi_mean) * 100, 1),
             "harvest_detection": harvest_detection,
+            "area_statistics": {
+                "total_area_m2": round(gee_area, 2),
+                "total_area_acres": round(gee_area * 0.000247105, 4),
+                "total_area_hectares": round(gee_area / 10000.0, 4)
+            },
             "analysis_date": datetime.now(UTC).date().isoformat(),
             "data_source": "Sentinel-2 SR (GEE)",
         }
@@ -166,11 +210,11 @@ async def get_ndvi(
             upsert=True,
         )
 
-        logger.info("GEE NDVI computed for %s: %.4f (%s)", location_name, ndvi_mean, crop_health)
+        logger.info("GEE NDVI/NDWI/EVI computed for %s: NDVI=%.4f (%s)", location_name, ndvi_mean, crop_health)
         return result
 
     except Exception as exc:
-        logger.error("GEE NDVI computation failed: %s", exc)
+        logger.error("GEE NDVI/NDWI/EVI computation failed: %s", exc)
         return _fallback_satellite_response(location_name)
 
 
@@ -215,9 +259,23 @@ def _fallback_satellite_response(location_name: str) -> dict[str, Any]:
     return {
         "location": location_name,
         "ndvi": None,
+        "ndvi_min": None,
+        "ndvi_max": None,
+        "ndwi": None,
+        "ndwi_min": None,
+        "ndwi_max": None,
+        "evi": None,
+        "evi_min": None,
+        "evi_max": None,
         "crop_health": "Satellite analysis unavailable",
+        "vegetation_health": "Satellite analysis unavailable",
         "vegetation_index": None,
         "harvest_detection": "Satellite analysis unavailable",
+        "area_statistics": {
+            "total_area_m2": 0.0,
+            "total_area_acres": 0.0,
+            "total_area_hectares": 0.0
+        },
         "message": (
             "Google Earth Engine is not configured. "
             "Set GEE_SERVICE_ACCOUNT and GEE_KEY_FILE in .env to enable satellite features."

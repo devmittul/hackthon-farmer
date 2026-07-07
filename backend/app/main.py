@@ -187,6 +187,7 @@ def _register_routes(app: FastAPI) -> None:
     from app.routes.vehicle import router as vehicle_router
     from app.routes.voice import router as voice_router
     from app.routes.weather import router as weather_router
+    from app.routes.farm_routes import router as farm_router
 
     api_prefix = "/api/v1"
 
@@ -197,6 +198,7 @@ def _register_routes(app: FastAPI) -> None:
     app.include_router(vehicle_router, prefix=api_prefix)
     app.include_router(route_router, prefix=api_prefix)
     app.include_router(weather_router, prefix=api_prefix)
+    app.include_router(farm_router, prefix=api_prefix)
     app.include_router(courier_router, prefix=api_prefix)
     app.include_router(sos_router, prefix=api_prefix)
     app.include_router(twin_router, prefix=api_prefix)   # ← Digital Twin
@@ -204,7 +206,7 @@ def _register_routes(app: FastAPI) -> None:
     from app.routes.system import router as system_router
     app.include_router(system_router, prefix=api_prefix)
 
-    logger.info("Registered %d routers under %s", 10, api_prefix)
+    logger.info("Registered %d routers under %s", 12, api_prefix)
 
 
 def _register_exception_handlers(app: FastAPI) -> None:

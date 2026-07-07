@@ -1,11 +1,12 @@
 import { useState, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { Stethoscope, UploadCloud, Camera, Mic, CheckCircle2, AlertTriangle, AlertOctagon } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Stethoscope, UploadCloud, Camera, Mic, CheckCircle2, AlertTriangle, AlertOctagon, Scan, ShieldAlert, FileWarning, Leaf, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/services/api';
+import { cn } from '@/lib/utils';
 
 export default function DiseaseDiagnosis() {
   const [file, setFile] = useState<File | null>(null);
@@ -13,6 +14,7 @@ export default function DiseaseDiagnosis() {
   const [analyzing, setAnalyzing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -21,6 +23,7 @@ export default function DiseaseDiagnosis() {
       setFile(selectedFile);
       setPreviewUrl(URL.createObjectURL(selectedFile));
       setResult(null);
+      setError(null);
     }
   };
 
@@ -28,6 +31,7 @@ export default function DiseaseDiagnosis() {
     if (!file) return;
     setAnalyzing(true);
     setProgress(0);
+    setError(null);
     
     // Simulate progress
     const interval = setInterval(() => {
@@ -40,55 +44,80 @@ export default function DiseaseDiagnosis() {
       });
     }, 100);
 
-    const data = await api.diagnoseDisease(file, null);
-    
-    clearInterval(interval);
-    setProgress(100);
-    setTimeout(() => {
-      setResult(data);
+    try {
+      const data = await api.diagnoseDisease(file);
+      clearInterval(interval);
+      setProgress(100);
+      setTimeout(() => {
+        setResult(data);
+        setAnalyzing(false);
+      }, 500);
+    } catch (err: any) {
+      clearInterval(interval);
       setAnalyzing(false);
-    }, 500);
+      setError(err.message || 'Analysis failed. Please try again.');
+    }
   };
 
   const getSeverityIcon = (severity: string) => {
     switch (severity.toLowerCase()) {
-      case 'low': return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-      case 'medium': return <AlertTriangle className="h-5 w-5 text-orange-500" />;
-      case 'high': return <AlertOctagon className="h-5 w-5 text-red-500" />;
+      case 'low': return <CheckCircle2 className="h-5 w-5 text-green-500" strokeWidth={1.5} />;
+      case 'medium': return <AlertTriangle className="h-5 w-5 text-orange-500" strokeWidth={1.5} />;
+      case 'high': return <AlertOctagon className="h-5 w-5 text-red-500" strokeWidth={1.5} />;
       default: return null;
     }
   };
 
+  const getSeverityColor = (severity: string) => {
+    switch (severity.toLowerCase()) {
+      case 'low': return 'bg-green-100/50';
+      case 'medium': return 'bg-orange-100/50';
+      case 'high': return 'bg-red-100/50';
+      default: return 'bg-muted';
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="bg-red-100 p-2 rounded-lg dark:bg-red-900/30">
-          <Stethoscope className="h-6 w-6 text-red-600 dark:text-red-400" />
+    <div className="flex flex-col gap-10 w-full max-w-7xl mx-auto pb-20">
+      {/* Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-5 mb-4 pt-6"
+      >
+        <div className="bg-rose-100/80 p-4 rounded-full">
+          <Stethoscope className="h-8 w-8 text-rose-700" strokeWidth={1.5} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Crop Disease Diagnosis</h1>
-          <p className="text-muted-foreground">Upload a photo of your crop to instantly identify diseases.</p>
+          <h1 className="text-4xl font-semibold tracking-tight text-foreground">Disease Diagnosis</h1>
+          <p className="text-muted-foreground text-lg font-light mt-2">Computer vision neural networks to instantly classify crop health.</p>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Provide Input</CardTitle>
-            <CardDescription>Upload an image or record a voice description.</CardDescription>
+      <div className="grid lg:grid-cols-2 gap-10">
+        {/* Input Column */}
+        <Card className="glass-card flex flex-col relative overflow-hidden">
+          <CardHeader className="pb-6 border-b border-border/50 bg-muted/30 relative z-10 px-8 pt-8">
+            <CardTitle className="text-xl font-semibold flex items-center gap-3 text-foreground">
+              <Camera className="h-6 w-6 text-primary" strokeWidth={1.5} /> Image Upload
+            </CardTitle>
+            <CardDescription className="text-base font-light mt-1">Upload a clear photo of the affected plant.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-8 relative z-10 px-8 pb-8">
             <Tabs defaultValue="image" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="image">Upload Image</TabsTrigger>
-                <TabsTrigger value="voice">Voice Assist</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 h-14 bg-muted/50 rounded-full p-1.5 mb-8">
+                <TabsTrigger value="image" className="rounded-full text-base font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Upload Image</TabsTrigger>
+                <TabsTrigger value="voice" className="rounded-full text-base font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Voice Assist</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="image" className="space-y-4 pt-4">
+              <TabsContent value="image" className="space-y-8">
                 <div 
-                  className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-colors ${previewUrl ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{ cursor: 'pointer' }}
+                  className={cn(
+                    "border-2 border-dashed rounded-[32px] p-10 flex flex-col items-center justify-center text-center transition-all duration-300 min-h-[360px]",
+                    previewUrl ? 'border-primary/30 bg-primary/5' : 'border-border bg-white hover:bg-muted/30',
+                    analyzing && "opacity-50 pointer-events-none"
+                  )}
+                  onClick={() => !analyzing && fileInputRef.current?.click()}
+                  style={{ cursor: analyzing ? 'default' : 'pointer' }}
                 >
                   <input 
                     type="file" 
@@ -99,56 +128,78 @@ export default function DiseaseDiagnosis() {
                   />
                   
                   {previewUrl ? (
-                    <div className="relative w-full aspect-video rounded-lg overflow-hidden mb-4">
-                      <img src={previewUrl} alt="Preview" className="object-cover w-full h-full" />
+                    <div className="relative w-full aspect-[4/3] rounded-[24px] overflow-hidden mb-6 shadow-sm border border-border">
+                      <img src={previewUrl} alt="Preview" className="object-cover w-full h-full hover:scale-105 transition-transform duration-700" />
+                      {analyzing && (
+                        <div className="absolute inset-0 bg-white/60 flex items-center justify-center backdrop-blur-sm">
+                          <Scan className="h-14 w-14 text-primary animate-pulse" strokeWidth={1.5} />
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <>
-                      <div className="bg-muted p-4 rounded-full mb-4">
-                        <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                    <div className="py-12">
+                      <div className="bg-muted p-5 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-8 group-hover:bg-primary/10 transition-colors">
+                        <UploadCloud className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={1} />
                       </div>
-                      <h3 className="font-semibold mb-1">Click to upload or drag and drop</h3>
-                      <p className="text-sm text-muted-foreground">JPG, PNG or WEBP (max. 5MB)</p>
-                    </>
+                      <h3 className="text-xl font-semibold text-foreground mb-3">Drag & drop image here</h3>
+                      <p className="text-base text-muted-foreground font-light">Supports JPG, PNG or WEBP up to 5MB</p>
+                    </div>
                   )}
                   
-                  <div className="flex gap-2 mt-4">
-                    <Button variant="outline" type="button" onClick={(e: React.MouseEvent) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
-                      <UploadCloud className="mr-2 h-4 w-4" /> Browse
+                  <div className="flex gap-4 mt-4 w-full">
+                    <Button variant="outline" type="button" className="flex-1 h-14 rounded-full border-transparent bg-muted/50 hover:bg-muted text-foreground font-medium text-base shadow-sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
+                      <UploadCloud className="mr-2 h-5 w-5 text-primary" strokeWidth={1.5} /> Browse
                     </Button>
-                    <Button variant="outline" type="button" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                      <Camera className="mr-2 h-4 w-4" /> Camera
+                    <Button variant="outline" type="button" className="flex-1 h-14 rounded-full border-transparent bg-muted/50 hover:bg-muted text-foreground font-medium text-base shadow-sm" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                      <Camera className="mr-2 h-5 w-5 text-primary" strokeWidth={1.5} /> Camera
                     </Button>
                   </div>
                 </div>
 
                 <Button 
-                  className="w-full" 
-                  size="lg" 
+                  className="w-full h-16 text-lg rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-all active:scale-[0.98] bg-foreground hover:bg-foreground/90 text-background font-medium" 
                   disabled={!file || analyzing}
                   onClick={handleAnalyze}
                 >
-                  {analyzing ? 'Analyzing Image...' : 'Diagnose Disease'}
+                  {analyzing ? 'Processing Analysis...' : 'Run Diagnostics'}
                 </Button>
                 
-                {analyzing && (
-                  <div className="space-y-2 mt-4">
-                    <div className="flex justify-between text-sm">
-                      <span>Processing image with AI...</span>
-                      <span>{progress}%</span>
-                    </div>
-                    <Progress value={progress} className="h-2" />
-                  </div>
+                <AnimatePresence>
+                  {analyzing && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4 overflow-hidden">
+                      <div className="flex justify-between text-base font-medium text-muted-foreground">
+                        <span className="flex items-center gap-3"><Loader2 className="h-5 w-5 animate-spin text-primary" strokeWidth={1.5} /> Neural network processing</span>
+                        <span className="font-mono">{progress}%</span>
+                      </div>
+                      <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
+                        <motion.div 
+                          className="h-full bg-primary rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {error && (
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 flex items-center gap-3 text-red-700 bg-red-50 p-4 rounded-[20px]">
+                    <AlertTriangle className="h-5 w-5 shrink-0" strokeWidth={1.5} />
+                    <span className="text-sm font-medium">{error}</span>
+                  </motion.div>
                 )}
               </TabsContent>
               
-              <TabsContent value="voice" className="pt-4">
-                <div className="border rounded-xl p-8 flex flex-col items-center justify-center text-center bg-muted/30">
-                  <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6 cursor-pointer hover:bg-primary/20 transition-colors group">
-                    <Mic className="h-10 w-10 text-primary group-hover:scale-110 transition-transform" />
+              <TabsContent value="voice" className="pt-6">
+                <div className="border-2 border-dashed border-border rounded-[32px] p-16 flex flex-col items-center justify-center text-center bg-white min-h-[480px]">
+                  <div className="relative group">
+                    <div className="absolute inset-0 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-all" />
+                    <div className="w-28 h-28 rounded-full bg-white border border-border flex items-center justify-center mb-10 cursor-pointer relative z-10 shadow-[0_8px_30px_rgba(0,0,0,0.06)] group-hover:scale-105 transition-transform">
+                      <Mic className="h-12 w-12 text-primary" strokeWidth={1} />
+                    </div>
                   </div>
-                  <h3 className="font-semibold text-lg mb-2">Tap to Speak</h3>
-                  <p className="text-muted-foreground max-w-sm">
+                  <h3 className="text-3xl font-semibold text-foreground mb-4">Tap to Speak</h3>
+                  <p className="text-lg text-muted-foreground max-w-sm font-light leading-relaxed">
                     Describe the symptoms you are seeing on your crops in your local language.
                   </p>
                 </div>
@@ -157,65 +208,105 @@ export default function DiseaseDiagnosis() {
           </CardContent>
         </Card>
 
-        <div>
-          {!result ? (
-            <Card className="h-full flex flex-col items-center justify-center text-center p-6 bg-muted/30 border-dashed">
-              <Stethoscope className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
-              <h3 className="text-xl font-medium text-muted-foreground mb-2">No Analysis Yet</h3>
-              <p className="text-sm text-muted-foreground max-w-xs">
-                Upload an image or record a voice description to get AI-powered diagnosis.
-              </p>
-            </Card>
-          ) : (
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-              <Card className="border-t-4 border-t-red-500 overflow-hidden relative shadow-md">
-                <div className="absolute top-4 right-4 bg-muted px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
-                  Confidence: <span className="text-primary font-bold">{result.confidence}%</span>
-                </div>
-                <CardHeader>
-                  <CardTitle className="text-2xl">{result.disease}</CardTitle>
-                  <CardDescription className="flex items-center gap-2 mt-1">
-                    Severity: 
-                    <span className="flex items-center gap-1 font-medium text-foreground">
-                      {getSeverityIcon(result.severity)} {result.severity}
-                    </span>
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div>
-                    <h4 className="font-semibold mb-2 flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-orange-500" /> Symptoms Detected
-                    </h4>
-                    <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                      {result.symptoms.map((s: string, i: number) => <li key={i}>{s}</li>)}
-                    </ul>
+        {/* Results Column */}
+        <div className="h-full">
+          <AnimatePresence mode="wait">
+            {!result ? (
+              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+                <Card className="h-full flex flex-col items-center justify-center text-center p-16 border-2 border-dashed border-border bg-transparent shadow-none rounded-[32px]">
+                  <div className="bg-muted p-8 rounded-full mb-8">
+                    <Scan className="h-16 w-16 text-muted-foreground" strokeWidth={1} />
                   </div>
+                  <h3 className="text-2xl font-semibold text-foreground mb-4">Awaiting Analysis</h3>
+                  <p className="text-lg text-muted-foreground max-w-sm font-light leading-relaxed">
+                    Upload an image on the left to receive an AI-powered diagnostic report.
+                  </p>
+                </Card>
+              </motion.div>
+            ) : (
+              <motion.div key="result" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="h-full">
+                <Card className="glass-card overflow-hidden relative h-full flex flex-col">
+                  <div className={`absolute top-0 left-0 w-full h-3 ${getSeverityColor(result.severity)}`} />
                   
-                  <div className="bg-green-50 dark:bg-green-950/30 p-4 rounded-lg border border-green-200 dark:border-green-900">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2 text-green-800 dark:text-green-400">
-                      <CheckCircle2 className="h-4 w-4" /> Recommended Treatment
-                    </h4>
-                    <ul className="list-disc list-inside text-sm text-green-700 dark:text-green-500 space-y-1">
-                      {result.treatment.map((t: string, i: number) => <li key={i}>{t}</li>)}
-                    </ul>
-                  </div>
+                  <CardHeader className="pb-8 relative z-10 px-8 pt-10">
+                    <div className="flex justify-between items-start gap-6">
+                      <div>
+                        <div className="inline-flex items-center rounded-full bg-muted px-4 py-1.5 text-xs font-semibold text-muted-foreground mb-6 uppercase tracking-widest">
+                          Diagnostic Report
+                        </div>
+                        <CardTitle className="text-4xl font-semibold capitalize text-foreground mb-4">
+                          {result.disease}
+                        </CardTitle>
+                        <div className="flex items-center gap-3 mt-4 bg-white border border-border px-4 py-2 rounded-full w-fit">
+                          <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Severity:</span>
+                          <span className="flex items-center gap-2 font-semibold uppercase tracking-widest text-sm text-foreground">
+                            {getSeverityIcon(result.severity)} {result.severity}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="bg-white border border-border p-5 rounded-[24px] text-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] min-w-[100px]">
+                        <div className="text-4xl font-light text-foreground">{result.confidence}<span className="text-xl text-muted-foreground font-light">%</span></div>
+                        <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-2">Match</div>
+                      </div>
+                    </div>
+                  </CardHeader>
 
-                  <div>
-                    <h4 className="font-semibold mb-2 text-sm">Prevention</h4>
-                    <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                      {result.prevention.map((p: string, i: number) => <li key={i}>{p}</li>)}
-                    </ul>
-                  </div>
+                  <CardContent className="space-y-10 flex-1 overflow-y-auto custom-scrollbar px-8 pb-8">
+                    {/* Symptoms */}
+                    <div>
+                      <h4 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-5 flex items-center gap-3">
+                        <ShieldAlert className="h-5 w-5 text-orange-500" strokeWidth={1.5} /> Identified Symptoms
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {result.symptoms.map((s: string, i: number) => (
+                          <div key={i} className="bg-white border border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] p-5 rounded-[20px] text-base font-light text-foreground flex items-start gap-3">
+                            <span className="text-orange-500 mt-1 shrink-0">•</span> {s}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Treatment */}
+                    <div className="bg-green-50/50 p-8 rounded-[24px] border border-transparent">
+                      <h4 className="text-sm font-semibold uppercase tracking-widest text-green-700 mb-6 flex items-center gap-3">
+                        <CheckCircle2 className="h-5 w-5" strokeWidth={1.5} /> Recommended Protocol
+                      </h4>
+                      <ul className="space-y-4">
+                        {result.treatment.map((t: string, i: number) => (
+                          <li key={i} className="text-base font-light text-foreground flex items-start gap-4 leading-relaxed">
+                            <span className="text-green-600 mt-1 shrink-0 bg-green-100 p-1.5 rounded-full"><Leaf className="h-4 w-4" strokeWidth={1.5} /></span>
+                            {t}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
 
+                    {/* Prevention */}
+                    <div>
+                      <h4 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-5 flex items-center gap-3">
+                        <FileWarning className="h-5 w-5 text-blue-500" strokeWidth={1.5} /> Prevention Measures
+                      </h4>
+                      <ul className="space-y-4">
+                        {result.prevention.map((p: string, i: number) => (
+                          <li key={i} className="text-base text-foreground font-light flex items-start gap-4 bg-white border border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] p-5 rounded-[20px]">
+                            <span className="text-blue-500 mt-1 shrink-0">•</span>{p}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </CardContent>
+                  
                   {result.severity.toLowerCase() === 'high' && (
-                    <Button variant="destructive" className="w-full">
-                      Contact Agriculture Expert Now
-                    </Button>
+                    <div className="p-8 border-t border-border/50 bg-muted/20">
+                      <Button className="w-full h-16 text-lg font-medium rounded-full bg-red-500 hover:bg-red-600 text-white shadow-[0_8px_30px_rgba(239,68,68,0.2)] border-0 active:scale-[0.98] transition-transform">
+                        <AlertOctagon className="mr-3 h-6 w-6" strokeWidth={1.5} /> Contact Agronomy Expert Now
+                      </Button>
+                    </div>
                   )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>

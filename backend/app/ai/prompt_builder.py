@@ -6,7 +6,7 @@ Never concatenate strings randomly in routes or services.
 Every prompt follows a strict structure:
   SYSTEM → Context → Facts → User Request → Instructions → Expected Output
 """
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from app.schemas.requests import IntentType, LanguageCode
 from app.utils.language import LANGUAGE_NAMES

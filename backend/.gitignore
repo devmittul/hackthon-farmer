@@ -28,7 +28,7 @@ env/
 # ML Models (large binary files – store in model registry instead)
 app/ai/ml/saved_models/*.joblib
 app/ai/ml/saved_models/*.pkl
-models/
+/models/
 
 # Audio outputs (runtime generated)
 audio_outputs/

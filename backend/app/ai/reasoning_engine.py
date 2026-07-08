@@ -218,10 +218,13 @@ class ReasoningEngine:
             
             try:
                 start = time.perf_counter()
-                # google-generativeai is sync; wrap in thread
-                response = await asyncio.to_thread(
-                    model.generate_content,
-                    prompt,
+                # google-generativeai is sync; wrap in thread with strict timeout
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        model.generate_content,
+                        prompt,
+                    ),
+                    timeout=30.0
                 )
                 elapsed_ms = (time.perf_counter() - start) * 1000
                 text = response.text.strip()

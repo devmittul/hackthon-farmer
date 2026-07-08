@@ -23,7 +23,8 @@ export default function Dashboard() {
     activeFarm, 
     language,
     farms,
-    loadFarms
+    loadFarms,
+    lastRefreshedAt
   } = useAppStore();
   const [weather, setWeather] = useState<WeatherData | null>(weatherCache);
   const [weatherLoading, setWeatherLoading] = useState(!weatherCache);
@@ -92,7 +93,7 @@ export default function Dashboard() {
     // Load farms for chat context
     loadFarms().catch((err) => console.error("Failed to load farms for chat context:", err));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeLocation]);
+  }, [activeLocation, lastRefreshedAt]);
 
   // Sync selected farm ID when activeFarm changes
   useEffect(() => {

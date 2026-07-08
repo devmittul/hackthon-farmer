@@ -39,7 +39,13 @@ class SatelliteProvider(BaseProvider):
         name = params.get("location_name", "unknown")
         boundary = params.get("boundary")
 
-        sat = await get_ndvi(lat, lon, location_name=name, boundary=boundary)
+        sat = await get_ndvi(
+            lat,
+            lon,
+            location_name=name,
+            boundary=boundary,
+            force_refresh=params.get("force_refresh", False)
+        )
         if sat and sat.get("ndvi") is not None:
             return sat
         return None

@@ -27,3 +27,13 @@ dist-ssr
 gee-*.json
 response.json
 .env
+.env.*
+*.pem
+*.key
+gee-service-key.json
+
+# Directories
+build
+uploads
+__pycache__
+.pytest_cache

@@ -36,15 +36,13 @@ class Settings(BaseSettings):
     port: int = Field(default=8000)
 
     # ── Security ──────────────────────────────────────────────────────────────
-    secret_key: str = Field(
-        default="changeme_this_is_insecure_default_key_replace_in_production"
-    )
+    secret_key: str = Field(...)
     algorithm: str = Field(default="HS256")
     access_token_expire_minutes: int = Field(default=60)
     refresh_token_expire_days: int = Field(default=30)
 
     # ── MongoDB ───────────────────────────────────────────────────────────────
-    mongodb_uri: str = Field(default="mongodb://localhost:27017")
+    mongodb_uri: str = Field(...)
     mongodb_db_name: str = Field(default="krishimitra")
 
     # ── Claude AI (current default) ───────────────────────────────────────────
@@ -57,7 +55,7 @@ class Settings(BaseSettings):
     ai_provider: str = Field(default="claude")
 
     # ── Gemini AI (optional future provider) ──────────────────────────────────
-    gemini_api_key: str = Field(default="")
+    gemini_api_key: str = Field(...)
     
     @property
     def gemini_keys_list(self) -> List[str]:
@@ -92,9 +90,7 @@ class Settings(BaseSettings):
     audio_output_dir: str = Field(default="./audio_outputs")
 
     # ── CORS ──────────────────────────────────────────────────────────────────
-    allowed_origins: str = Field(
-        default="http://localhost:5173,http://localhost:3000"
-    )
+    allowed_origins: str = Field(...)
 
     @field_validator("allowed_origins", mode="before")
     @classmethod
@@ -110,6 +106,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
+
+    @property
+    def is_debug(self) -> bool:
+        return False if self.is_production else self.debug
 
 
 @lru_cache(maxsize=1)

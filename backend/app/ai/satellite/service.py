@@ -61,6 +61,7 @@ async def get_ndvi(
     location_name: str = "unknown",
     radius_km: float = 2.0,
     boundary: Optional[dict[str, Any]] = None,
+    force_refresh: bool = False,
 ) -> Optional[dict[str, Any]]:
     """
     Calculate NDVI and crop health metrics for a given location.
@@ -84,17 +85,18 @@ async def get_ndvi(
         # Check cache first
         cache_key = f"satellite:{location_name.lower()}:{latitude:.3f}:{longitude:.3f}"
         col = get_collection("satellite_data")
-        cached = await col.find_one(
-            {
-                "cache_key": cache_key,
-                "processed_at": {
-                    "$gt": datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-                },
-            }
-        )
-        if cached:
-            logger.debug("Satellite cache HIT: %s", cache_key)
-            return cached["result_data"]
+        if not force_refresh:
+            cached = await col.find_one(
+                {
+                    "cache_key": cache_key,
+                    "processed_at": {
+                        "$gt": datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+                    },
+                }
+            )
+            if cached:
+                logger.debug("Satellite cache HIT: %s", cache_key)
+                return cached["result_data"]
 
         # Define area of interest
         if boundary and boundary.get("type") == "Polygon":
@@ -138,15 +140,23 @@ async def get_ndvi(
 
         combined_image = ndvi_image.addBands(ndwi_image).addBands(evi_image)
 
-        stats = combined_image.reduceRegion(
-            reducer=ee.Reducer.mean().combine(
-                reducer2=ee.Reducer.minMax(),
-                sharedInputs=True,
+        import asyncio
+        
+        # Calculate statistics asynchronously to avoid blocking event loop
+        stats = await asyncio.wait_for(
+            asyncio.to_thread(
+                combined_image.reduceRegion(
+                    reducer=ee.Reducer.mean().combine(
+                        reducer2=ee.Reducer.minMax(),
+                        sharedInputs=True,
+                    ),
+                    geometry=aoi,
+                    scale=10,
+                    maxPixels=1e8,
+                ).getInfo
             ),
-            geometry=aoi,
-            scale=10,
-            maxPixels=1e8,
-        ).getInfo()
+            timeout=30.0
+        )
 
         ndvi_mean = stats.get("NDVI_mean") or 0.0
         ndvi_min = stats.get("NDVI_min") or 0.0
@@ -161,7 +171,10 @@ async def get_ndvi(
         evi_max = stats.get("EVI_max") or 0.0
 
         # Calculate Area Statistics in square meters
-        gee_area = aoi.area(maxError=1).getInfo()
+        gee_area = await asyncio.wait_for(
+            asyncio.to_thread(aoi.area(maxError=1).getInfo),
+            timeout=10.0
+        )
 
         # Interpret NDVI / EVI for health
         crop_health = _interpret_ndvi(ndvi_mean)
@@ -290,6 +303,7 @@ async def get_soil_data(
     longitude: float,
     location_name: str = "unknown",
     boundary: Optional[dict[str, Any]] = None,
+    force_refresh: bool = False,
 ) -> Optional[dict[str, Any]]:
     """
     Extract soil statistics (Texture, pH, Organic Carbon, Bulk Density) using Google Earth Engine.
@@ -305,16 +319,17 @@ async def get_soil_data(
         # Check cache first
         cache_key = f"soil_gee:{location_name.lower()}:{latitude:.3f}:{longitude:.3f}"
         col = get_collection("satellite_data") # reuse same collection for cache
-        cached = await col.find_one(
-            {
-                "cache_key": cache_key,
-                "processed_at": {
-                    "$gt": datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-                },
-            }
-        )
-        if cached:
-            return cached["result_data"]
+        if not force_refresh:
+            cached = await col.find_one(
+                {
+                    "cache_key": cache_key,
+                    "processed_at": {
+                        "$gt": datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+                    },
+                }
+            )
+            if cached:
+                return cached["result_data"]
 
         # Define area of interest
         if boundary and boundary.get("type") == "Polygon":
@@ -343,12 +358,19 @@ async def get_soil_data(
             sharedInputs=True
         )
 
-        stats = combined.reduceRegion(
-            reducer=combined_reducer,
-            geometry=aoi,
-            scale=250,
-            maxPixels=1e8
-        ).getInfo()
+        import asyncio
+        
+        stats = await asyncio.wait_for(
+            asyncio.to_thread(
+                combined.reduceRegion(
+                    reducer=combined_reducer,
+                    geometry=aoi,
+                    scale=250,
+                    maxPixels=1e8
+                ).getInfo
+            ),
+            timeout=30.0
+        )
 
         texture_val = stats.get('texture_mode')
         ph_val = stats.get('ph_mean')

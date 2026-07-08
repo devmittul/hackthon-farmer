@@ -34,7 +34,8 @@ class GEESoilProvider(BaseProvider):
             latitude=lat,
             longitude=lon,
             location_name=loc_name,
-            boundary=boundary
+            boundary=boundary,
+            force_refresh=params.get("force_refresh", False)
         )
         
         if not soil_stats:

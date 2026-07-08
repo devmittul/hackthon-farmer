@@ -135,6 +135,7 @@ All authenticated endpoints require: `Authorization: Bearer <token>`
         license_info={
             "name": "MIT",
         },
+        debug=settings.is_debug,
     )
 
     # ── Rate Limiter ──────────────────────────────────────────────────────────
@@ -144,6 +145,9 @@ All authenticated endpoints require: `Authorization: Bearer <token>`
     # ── Middleware (order: outermost first) ───────────────────────────────────
     # 1. Error handler – catch everything
     app.add_middleware(ErrorHandlerMiddleware)
+    
+    from app.middleware.security import SecurityHeadersMiddleware
+    app.add_middleware(SecurityHeadersMiddleware)
 
     # 2. CORS – must be before request logging
     app.add_middleware(

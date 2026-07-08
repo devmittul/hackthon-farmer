@@ -5,7 +5,7 @@
  */
 import type { Farm, CreateFarmPayload, UpdateFarmPayload } from '@/types/farm';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 // ── Auth token helpers ────────────────────────────────────────────────────────
 export const tokenStore = {
@@ -153,7 +153,6 @@ export const chatApi = {
     fieldId?: string,
     farmId?: string,
   ) => {
-    const startTime = performance.now();
     try {
       const response = await apiFetch<ChatMessage>('/chat', {
         method: 'POST',
@@ -166,12 +165,8 @@ export const chatApi = {
           farm_id: farmId,
         }),
       });
-      const latencyMs = performance.now() - startTime;
-      console.log(`Frontend Request (/chat) completed in ${latencyMs.toFixed(2)}ms`);
       return response;
     } catch (error) {
-      const latencyMs = performance.now() - startTime;
-      console.error(`Frontend Request (/chat) failed after ${latencyMs.toFixed(2)}ms`, error);
       throw error;
     }
   },
@@ -408,11 +403,16 @@ export const api = {
     if (!file) throw new Error('No image file provided. Please upload a plant photo first.');
 
     // ── Read model/key from env vars (never hardcoded) ──────────────────────
-    const apiKey   = import.meta.env.VITE_GEMINI_API_KEY as string;
+    const apiKeysRaw = import.meta.env.VITE_GEMINI_API_KEY as string;
     const model    = (import.meta.env.VITE_GEMINI_MODEL as string) || 'gemini-2.5-flash';
 
-    if (!apiKey) {
+    if (!apiKeysRaw) {
       throw new Error('VITE_GEMINI_API_KEY is not set. Please add it to your .env file.');
+    }
+    
+    const apiKeys = apiKeysRaw.split(',').map(k => k.trim()).filter(Boolean);
+    if (apiKeys.length === 0) {
+      throw new Error('No valid keys in VITE_GEMINI_API_KEY.');
     }
 
     // ── Validate image MIME type before uploading ────────────────────────────
@@ -435,54 +435,66 @@ export const api = {
       reader.readAsDataURL(file);
     });
 
-    // ── Call Gemini REST API (v1beta) ────────────────────────────────────────
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    let response: Response | null = null;
+    let lastError: Error | null = null;
 
-    let response: Response;
-    try {
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                text: [
-                  'You are an expert plant pathologist with 20 years of field experience.',
-                  'Analyze the provided crop leaf image carefully.',
-                  'Identify the disease, or confirm if the plant is healthy.',
-                  'You MUST respond with ONLY a raw JSON object — no markdown, no explanation, no code fences.',
-                  'Required keys: "disease" (string), "confidence" (number 0-100),',
-                  '"severity" (exactly one of: "Low", "Medium", "High"),',
-                  '"symptoms" (array of 3-5 strings), "causes" (array of 2-4 strings),',
-                  '"treatment" (array of 3-5 actionable strings),',
-                  '"prevention" (array of 3-5 strings).',
-                ].join(' '),
-              },
-              {
-                inlineData: { mimeType, data: base64Data },
-              },
-            ],
-          }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
-        }),
-      });
-    } catch (networkErr: any) {
-      throw new Error(`Network error — could not reach Gemini API. Check your internet connection. (${networkErr.message})`);
+    // ── Call Gemini REST API (v1beta) with Key Rotation ──────────────────────
+    for (const apiKey of apiKeys) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {
+                  text: [
+                    'You are an expert plant pathologist with 20 years of field experience.',
+                    'Analyze the provided crop leaf image carefully.',
+                    'Identify the disease, or confirm if the plant is healthy.',
+                    'You MUST respond with ONLY a raw JSON object — no markdown, no explanation, no code fences.',
+                    'Required keys: "disease" (string), "confidence" (number 0-100),',
+                    '"severity" (exactly one of: "Low", "Medium", "High"),',
+                    '"symptoms" (array of 3-5 strings), "causes" (array of 2-4 strings),',
+                    '"treatment" (array of 3-5 actionable strings),',
+                    '"prevention" (array of 3-5 strings).',
+                  ].join(' '),
+                },
+                {
+                  inlineData: { mimeType, data: base64Data },
+                },
+              ],
+            }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+          }),
+        });
+
+        if (!response.ok) {
+          let errBody: any = {};
+          try { errBody = await response.json(); } catch { /* ignore */ }
+          const apiMsg: string = errBody?.error?.message || response.statusText;
+          const code: number   = errBody?.error?.code    || response.status;
+          
+          if (code === 429 || code === 401 || code === 403 || code >= 500) {
+            lastError = new Error(`Gemini API error ${code}: ${apiMsg}`);
+            continue; // Try next key
+          }
+          
+          if (code === 400) throw new Error(`Invalid request — image may be corrupted or too large. (${apiMsg})`);
+          if (code === 404) throw new Error(`Model "${model}" not found. Change VITE_GEMINI_MODEL to "gemini-2.5-flash". (${apiMsg})`);
+          throw new Error(`Gemini API error ${code}: ${apiMsg}`);
+        }
+        
+        break; // Success! Break out of the loop
+      } catch (networkErr: any) {
+        lastError = new Error(`Network error — could not reach Gemini API. Check your internet connection. (${networkErr.message})`);
+      }
     }
 
-    // ── Handle all HTTP-level errors explicitly ──────────────────────────────
-    if (!response.ok) {
-      let errBody: any = {};
-      try { errBody = await response.json(); } catch { /* ignore */ }
-      const apiMsg: string = errBody?.error?.message || response.statusText;
-      const code: number   = errBody?.error?.code    || response.status;
-      if (code === 400) throw new Error(`Invalid request — image may be corrupted or too large. (${apiMsg})`);
-      if (code === 401 || code === 403) throw new Error(`Invalid or unauthorized Gemini API key. Check VITE_GEMINI_API_KEY. (${apiMsg})`);
-      if (code === 404) throw new Error(`Model "${model}" not found. Change VITE_GEMINI_MODEL to "gemini-2.5-flash". (${apiMsg})`);
-      if (code === 429) throw new Error(`Gemini quota exceeded. Please wait a moment and try again. (${apiMsg})`);
-      if (code >= 500) throw new Error(`Gemini server error (${code}). Try again shortly. (${apiMsg})`);
-      throw new Error(`Gemini API error ${code}: ${apiMsg}`);
+    if (!response || !response.ok) {
+      throw lastError || new Error('All Gemini API keys failed or were rate limited. Please try again later.');
     }
 
     // ── Parse response safely ────────────────────────────────────────────────

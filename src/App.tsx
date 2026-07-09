@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { MainLayout } from '@/layouts/MainLayout';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { useAppStore } from '@/store/useAppStore';
+import { ChatProvider } from '@/store/ChatContext';
 
 import Home from '@/pages/Home';
 import Login from '@/pages/Login';
@@ -32,6 +33,7 @@ function App() {
   }, []);
 
   return (
+    <ChatProvider>
     <BrowserRouter>
       <Routes>
         <Route element={<MainLayout />}>
@@ -61,6 +63,7 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </ChatProvider>
   );
 }
 

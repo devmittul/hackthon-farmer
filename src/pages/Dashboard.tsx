@@ -2,11 +2,15 @@ import { useEffect, useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Cloud, Droplets, Wind, Leaf, Stethoscope, ArrowRight, MessageSquare, Thermometer, Send, Loader2, CheckCircle2, XCircle, Activity, Map, BarChart3, Clock, AlertTriangle, MapPin } from 'lucide-react';
+import { Cloud, Droplets, Wind, Leaf, Stethoscope, ArrowRight, MessageSquare, Thermometer, Send, Loader2, CheckCircle2, Activity, Map, BarChart3, Clock, AlertTriangle, MapPin, Mic, PhoneCall, Copy, RotateCcw, Bot } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 import { useAppStore } from '@/store/useAppStore';
+import { useChatContext } from '@/store/ChatContext';
 import { weatherApi, chatApi, systemApi, twinApi, type WeatherData, type ChatMessage } from '@/services/api';
 
 const WEATHER_TTL_MS = 15 * 60 * 1000;
@@ -28,12 +32,23 @@ export default function Dashboard() {
   } = useAppStore();
   const [weather, setWeather] = useState<WeatherData | null>(weatherCache);
   const [weatherLoading, setWeatherLoading] = useState(!weatherCache);
-  const [chatInput, setChatInput] = useState('');
-  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'ai'; text: string; intent?: string }>>([]);
-  const [chatLoading, setChatLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | undefined>();
-  const [selectedFarmId, setSelectedFarmId] = useState<string>(activeFarm?.farm_id || '');
+
+  // Chat state from context — survives page navigation, clears on refresh/close
+  const {
+    chatMessages, setChatMessages,
+    chatInput, setChatInput,
+    chatLoading, setChatLoading,
+    sessionId, setSessionId,
+    selectedFarmId, setSelectedFarmId,
+    resetChat,
+  } = useChatContext();
+
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const { toast } = useToast();
+
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
 
 
   const [systemStatus, setSystemStatus] = useState<Record<string, { status: string; message: string }> | null>(null);
@@ -95,16 +110,82 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLocation, lastRefreshedAt]);
 
-  // Sync selected farm ID when activeFarm changes
+  // Sync selected farm ID when activeFarm changes — only if not already set
+  // (preserves user's selection when navigating back to Dashboard)
   useEffect(() => {
-    if (activeFarm) {
+    if (activeFarm && !selectedFarmId) {
       setSelectedFarmId(activeFarm.farm_id);
     }
-  }, [activeFarm]);
+  }, [activeFarm, selectedFarmId, setSelectedFarmId]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, chatLoading]);
+
+  // Speech Recognition Setup
+  useEffect(() => {
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = language === 'hi' ? 'hi-IN' : language === 'gu' ? 'gu-IN' : language === 'mr' ? 'mr-IN' : language === 'ta' ? 'ta-IN' : language === 'te' ? 'te-IN' : 'en-IN';
+
+      recognitionRef.current.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognitionRef.current.onresult = (event: any) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          setChatInput(prev => (prev + ' ' + finalTranscript).trim());
+        }
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        setIsListening(false);
+        toast({
+          title: "Speech Recognition Failed",
+          description: `Error: ${event.error}`,
+          variant: "destructive"
+        });
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, [language, toast]);
+
+  const toggleListen = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      setChatInput('');
+      try {
+        recognitionRef.current?.start();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied",
+      description: "Message copied to clipboard",
+    });
+  };
 
   const syncLocation = () => {
     if (!navigator.geolocation) return;
@@ -229,43 +310,53 @@ export default function Dashboard() {
           </Card>
         </motion.div>
 
-        {/* System Status (3 cols) */}
+        {/* RSK Helpdesk (3 cols) */}
         <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }} className="md:col-span-4 xl:col-span-3">
           <Card className="h-full flex flex-col bg-white border-0 shadow-[0_8px_30px_rgba(0,0,0,0.04)] rounded-[40px] relative overflow-hidden hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)] transition-all">
             <CardHeader className="pb-2 relative z-10">
               <CardTitle className="text-sm font-semibold uppercase tracking-widest text-green-700 flex items-center gap-3">
                 <div className="p-2 bg-green-100 rounded-full">
-                  <Activity className="h-4 w-4" strokeWidth={1.5} />
+                  <PhoneCall className="h-4 w-4" strokeWidth={1.5} />
                 </div>
-                Core Services
+                RSK HELPDESK
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 relative z-10 pt-6 pb-8 px-8">
-              {systemStatus ? (
-                <div className="space-y-6">
-                  {[
-                    { key: 'claude_api', name: 'Claude AI Engine' },
-                    { key: 'weather', name: 'Meteo Data Source' },
-                    { key: 'earth_engine', name: 'Earth Engine DB' },
-                  ].map(({ key, name }) => {
-                    const s = systemStatus[key];
-                    const isLive = s?.status === 'Live';
-                    return (
-                      <div key={key} className="flex items-center justify-between text-base">
-                        <span className="font-light text-foreground">{name}</span>
-                        <div className={`flex items-center gap-2 font-medium text-xs px-3 py-1.5 rounded-full ${isLive ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-                          {isLive ? <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" /> : <XCircle className="h-3 w-3" strokeWidth={1.5} />}
-                          {s?.status || 'Offline'}
-                        </div>
-                      </div>
-                    );
-                  })}
+            <CardContent className="flex-1 relative z-10 pt-4 pb-8 px-8 flex flex-col justify-between">
+              <div>
+                <h3 className="font-semibold text-foreground text-lg mb-1">Kisan Call Center / RSK Hub</h3>
+                <CardDescription className="text-sm font-light mb-5">Nirman Nagar Area Support</CardDescription>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Officer:</span>
+                    <span className="font-bold text-foreground">Shri Rajesh Kumar</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Toll-Free:</span>
+                    <span className="font-bold text-green-600">1962</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Direct Line:</span>
+                    <span className="font-bold text-foreground">+91 94403 12345</span>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-base text-muted-foreground h-full flex items-center justify-center font-light">
-                  {!systemLoading && "Status unavailable"}
-                </div>
-              )}
+              </div>
+              <div className="flex gap-3 mt-6">
+                <Button 
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-full h-11"
+                  onClick={() => {
+                    window.location.href = 'tel:1962';
+                  }}
+                >
+                  Call Center
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="flex-1 rounded-full h-11 text-green-700 border-green-600 hover:bg-green-50 bg-white"
+                  onClick={() => setShowHelpModal(true)}
+                >
+                  Request Help
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </motion.div>
@@ -351,24 +442,32 @@ export default function Dashboard() {
 
         {/* AI Chat Widget (4 cols) */}
         <div className="md:col-span-8 xl:col-span-4 sticky top-32" style={{ height: 'calc(100vh - 160px)', minHeight: '600px', maxHeight: '900px' }}>
-          {/* height is explicit on the outer div; all children use h-full + flex to fill it */}
           <div className="h-full flex flex-col rounded-[40px] overflow-hidden border-0 shadow-[0_8px_30px_rgba(0,0,0,0.04)] bg-white/90 backdrop-blur-2xl">
-
-            {/* Header — fixed, never scrolls */}
+            {/* Header */}
             <div className="flex-shrink-0 flex flex-col gap-4 px-8 py-6 border-b border-border/50 bg-white">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                  <MessageSquare className="h-5 w-5 text-green-700" strokeWidth={1.5} />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                    <Bot className="h-6 w-6 text-green-700" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold text-foreground flex items-center gap-2">
+                      KrishiMitra AI
+                      <span className="text-[10px] bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Gemini 2.0</span>
+                    </div>
+                    <div className="text-sm font-light text-muted-foreground">Your personalized farming assistant</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-lg font-semibold text-foreground">KrishiMitra Assistant</div>
-                  <div className="text-sm font-light text-muted-foreground">Powered by Claude AI</div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" onClick={resetChat}>
+                    <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                  </Button>
                 </div>
               </div>
 
               {/* Farm context selector */}
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/30">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Chat Context:</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Context:</span>
                 <select
                   value={selectedFarmId}
                   onChange={(e) => setSelectedFarmId(e.target.value)}
@@ -384,14 +483,40 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Messages — takes all remaining height, scrolls */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4" style={{ overscrollBehavior: 'contain' }}>
+            {/* Messages */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6" style={{ overscrollBehavior: 'contain' }}>
               {chatMessages.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground gap-4">
-                  <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-                    <MessageSquare className="h-8 w-8 text-muted-foreground/50" strokeWidth={1.5} />
+                <div className="h-full flex flex-col items-center justify-center text-center gap-8">
+                  <div className="space-y-3">
+                    <h3 className="text-2xl font-semibold tracking-tight">Ask me anything</h3>
+                    <p className="text-sm font-light text-muted-foreground max-w-xs mx-auto">
+                      I'm your personalized farming assistant. Ask about crops, weather, soil health, pests, fertilizers and irrigation in your preferred language.
+                    </p>
                   </div>
-                  <p className="text-base font-light">Ask about weather, crops, <br/>or routes in any language.</p>
+                  <div className="w-full grid grid-cols-1 gap-3">
+                    {[
+                      { icon: '🌾', text: 'What crops should I grow this season?' },
+                      { icon: '☁️', text: 'What is today\'s weather forecast?' },
+                      { icon: '🍃', text: 'My crop leaves are turning yellow.' },
+                      { icon: '🧪', text: 'Which fertilizer should I use?' }
+                    ].map((sug, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setChatInput(sug.text);
+                          // We wait for state update to simulate typing then send
+                          setTimeout(() => {
+                            const btn = document.getElementById('chat-send-btn');
+                            btn?.click();
+                          }, 100);
+                        }}
+                        className="flex items-center gap-4 bg-muted/30 hover:bg-muted/80 p-4 rounded-[24px] border border-transparent transition-all text-left group w-full"
+                      >
+                        <span className="text-2xl group-hover:scale-110 transition-transform">{sug.icon}</span>
+                        <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">{sug.text}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               <AnimatePresence initial={false}>
@@ -400,31 +525,40 @@ export default function Dashboard() {
                     key={i}
                     initial={{ opacity: 0, y: 10, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex flex-col gap-1 ${m.role === 'user' ? 'items-end' : 'items-start'}`}
                   >
-                    <div className={`max-w-[85%] px-5 py-4 rounded-[20px] text-sm leading-relaxed shadow-sm ${
+                    <div className={`max-w-[85%] px-5 py-4 rounded-[24px] text-sm leading-relaxed shadow-sm relative group ${
                       m.role === 'user'
-                        ? 'bg-foreground text-background rounded-br-none'
-                        : 'bg-slate-50 text-slate-900 border border-slate-100 rounded-bl-none'
+                        ? 'bg-green-600 text-white rounded-br-sm'
+                        : 'bg-slate-50 text-slate-900 border border-slate-100 rounded-bl-sm'
                     }`}>
                       {m.role === 'ai' && m.intent && (
-                        <div className="text-[10px] text-green-700 mb-2 font-mono uppercase tracking-widest font-bold bg-green-100 w-fit px-2 py-0.5 rounded">
+                        <div className="text-[10px] text-green-700 mb-3 font-mono uppercase tracking-widest font-bold bg-green-100 w-fit px-2 py-0.5 rounded-full">
                           {m.intent}
                         </div>
                       )}
                       {m.role === 'ai' ? (
-                        <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-p:my-1 prose-headings:text-sm prose-pre:p-3 prose-pre:bg-white prose-pre:rounded-xl prose-pre:text-xs text-slate-900 prose-strong:text-slate-900">
+                        <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-p:my-2 prose-headings:text-sm prose-pre:p-4 prose-pre:bg-slate-900 prose-pre:rounded-xl prose-pre:text-slate-50 prose-strong:text-slate-900">
                           <ReactMarkdown>{m.text}</ReactMarkdown>
                         </div>
                       ) : (
                         <div className="whitespace-pre-wrap">{m.text}</div>
+                      )}
+                      {m.role === 'ai' && (
+                        <button
+                          onClick={() => copyToClipboard(m.text)}
+                          className="absolute -right-10 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 text-muted-foreground hover:text-foreground"
+                          title="Copy message"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
                       )}
                     </div>
                   </motion.div>
                 ))}
                 {chatLoading && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                    <div className="bg-slate-50 border border-slate-100 px-5 py-4 rounded-[20px] rounded-bl-none flex gap-1.5 items-center">
+                    <div className="bg-slate-50 border border-slate-100 px-6 py-5 rounded-[24px] rounded-bl-sm flex gap-2 items-center">
                       <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
                       <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
                       <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
@@ -435,42 +569,85 @@ export default function Dashboard() {
               <div ref={chatEndRef} />
             </div>
 
-            {/* Input footer — fixed, never scrolls */}
+            {/* Input footer */}
             <div className="flex-shrink-0 p-5 bg-white border-t border-border/50">
-              <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-                {['What crop to grow?', 'Will it rain today?', 'Show market prices'].map(q => (
-                  <button
-                    key={q}
-                    onClick={() => setChatInput(q)}
-                    className="text-xs px-3 py-1.5 rounded-full bg-muted/60 hover:bg-muted text-foreground transition-colors whitespace-nowrap border border-transparent flex-shrink-0"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-3">
+              <div className="flex gap-3 items-center relative">
+                <Button
+                  onClick={toggleListen}
+                  size="icon"
+                  variant="ghost"
+                  className={`absolute left-1.5 h-9 w-9 rounded-full z-10 ${isListening ? 'text-rose-500 bg-rose-50 hover:bg-rose-100 hover:text-rose-600' : 'text-muted-foreground hover:text-foreground'}`}
+                  title="Voice Input"
+                >
+                  <Mic className={`h-4 w-4 ${isListening ? 'animate-pulse' : ''}`} strokeWidth={isListening ? 2 : 1.5} />
+                </Button>
                 <Input
                   value={chatInput}
                   onChange={e => setChatInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && sendChat()}
-                  placeholder="Ask anything..."
+                  placeholder={isListening ? "Listening..." : "Ask anything..."}
                   disabled={chatLoading}
-                  className="rounded-full bg-muted/30 border-transparent focus-visible:ring-green-500 h-12 px-5 text-sm shadow-sm"
+                  className="rounded-full bg-muted/30 border-transparent focus-visible:ring-green-500 h-12 pl-12 pr-14 text-sm shadow-sm w-full transition-all"
                 />
                 <Button
+                  id="chat-send-btn"
                   onClick={sendChat}
                   disabled={chatLoading || !chatInput.trim()}
                   size="icon"
-                  className="rounded-full h-12 w-12 bg-foreground hover:bg-foreground/90 text-background shadow-[0_8px_30px_rgba(0,0,0,0.12)] flex-shrink-0 transition-transform active:scale-[0.96]"
+                  className="absolute right-1.5 rounded-full h-9 w-9 bg-green-600 hover:bg-green-700 text-white shadow-sm flex-shrink-0 transition-transform active:scale-[0.96] disabled:bg-muted disabled:text-muted-foreground"
                 >
                   {chatLoading ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Send className="h-4 w-4" strokeWidth={1.5} />}
                 </Button>
               </div>
             </div>
-
           </div>
         </div>
       </div>
+
+      <Dialog open={showHelpModal} onOpenChange={setShowHelpModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Request Support</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" placeholder="Full Name" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="mobile">Mobile Number</Label>
+              <Input id="mobile" placeholder="10-digit number" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="village">Village</Label>
+              <Input id="village" placeholder="Village Name" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="issue">Issue Type</Label>
+              <select id="issue" className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                <option value="crop">Crop Health</option>
+                <option value="weather">Weather Warning</option>
+                <option value="market">Market Pricing</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="desc">Description</Label>
+              <textarea id="desc" className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="Briefly describe your issue..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowHelpModal(false)}>Cancel</Button>
+            <Button onClick={() => {
+              setShowHelpModal(false);
+              toast({
+                title: "Success",
+                description: "Help request submitted successfully.",
+              });
+            }}>Submit</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

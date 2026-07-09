@@ -303,17 +303,17 @@ export const twinApi = {
   // Farmer
   getFarmer: () => apiFetch('/twin/farmer'),
   updateFarmer: (data: any) => apiFetch('/twin/farmer', { method: 'PUT', body: JSON.stringify(data) }),
-  
+
   // Farms
   getFarms: () => apiFetch('/twin/farms'),
   createFarm: (data: any) => apiFetch('/twin/farms', { method: 'POST', body: JSON.stringify(data) }),
   getFarmDetails: (farmId: string) => apiFetch(`/twin/farms/${farmId}`),
-  
+
   // Fields
   getFields: () => apiFetch('/twin/fields'),
   registerField: (data: any) => apiFetch('/twin/fields', { method: 'POST', body: JSON.stringify(data) }),
   updateField: (fieldId: string, data: any) => apiFetch(`/twin/fields/${fieldId}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  
+
   // Field Intelligence
   fetchSatellite: (fieldId: string) => apiFetch(`/twin/fields/${fieldId}/satellite`),
   recordHarvest: (fieldId: string, data: any) => apiFetch(`/twin/fields/${fieldId}/harvest`, { method: 'POST', body: JSON.stringify(data) }),
@@ -404,12 +404,12 @@ export const api = {
 
     // ── Read model/key from env vars (never hardcoded) ──────────────────────
     const apiKeysRaw = import.meta.env.VITE_GEMINI_API_KEY as string;
-    const model    = (import.meta.env.VITE_GEMINI_MODEL as string) || 'gemini-2.5-flash';
+    const model = (import.meta.env.VITE_GEMINI_MODEL as string) || 'gemini-2.5-flash';
 
     if (!apiKeysRaw) {
       throw new Error('VITE_GEMINI_API_KEY is not set. Please add it to your .env file.');
     }
-    
+
     const apiKeys = apiKeysRaw.split(',').map(k => k.trim()).filter(Boolean);
     if (apiKeys.length === 0) {
       throw new Error('No valid keys in VITE_GEMINI_API_KEY.');
@@ -441,7 +441,7 @@ export const api = {
     // ── Call Gemini REST API (v1beta) with Key Rotation ──────────────────────
     for (const apiKey of apiKeys) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      
+
       try {
         response = await fetch(endpoint, {
           method: 'POST',
@@ -451,11 +451,9 @@ export const api = {
               parts: [
                 {
                   text: [
-                    'You are an expert plant pathologist with 20 years of field experience.',
-                    'Analyze the provided crop leaf image carefully.',
-                    'Identify the disease, or confirm if the plant is healthy.',
-                    'You MUST respond with ONLY a raw JSON object — no markdown, no explanation, no code fences.',
-                    'Required keys: "disease" (string), "confidence" (number 0-100),',
+                    'Analyze this crop leaf image. Identify the disease or confirm healthy.',
+                    'Return a JSON object with these exact keys:',
+                    '"disease" (string), "confidence" (number 0-100),',
                     '"severity" (exactly one of: "Low", "Medium", "High"),',
                     '"symptoms" (array of 3-5 strings), "causes" (array of 2-4 strings),',
                     '"treatment" (array of 3-5 actionable strings),',
@@ -467,7 +465,12 @@ export const api = {
                 },
               ],
             }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 8192,
+              responseMimeType: "application/json",
+              thinkingConfig: { thinkingBudget: 0 },
+            },
           }),
         });
 
@@ -475,53 +478,117 @@ export const api = {
           let errBody: any = {};
           try { errBody = await response.json(); } catch { /* ignore */ }
           const apiMsg: string = errBody?.error?.message || response.statusText;
-          const code: number   = errBody?.error?.code    || response.status;
-          
+          const code: number = errBody?.error?.code || response.status;
+
           if (code === 429 || code === 401 || code === 403 || code >= 500) {
+            console.error(`[DiagnoseDisease] API error (retryable) — code=${code}, message=${apiMsg}`);
             lastError = new Error(`Gemini API error ${code}: ${apiMsg}`);
             continue; // Try next key
           }
-          
-          if (code === 400) throw new Error(`Invalid request — image may be corrupted or too large. (${apiMsg})`);
-          if (code === 404) throw new Error(`Model "${model}" not found. Change VITE_GEMINI_MODEL to "gemini-2.5-flash". (${apiMsg})`);
+
+          if (code === 400) {
+            console.error(`[DiagnoseDisease] API error — invalid request: ${apiMsg}`);
+            throw new Error(`Invalid request — image may be corrupted or too large. (${apiMsg})`);
+          }
+          if (code === 404) {
+            console.error(`[DiagnoseDisease] API error — model not found: ${apiMsg}`);
+            throw new Error(`Model "${model}" not found. Change VITE_GEMINI_MODEL to "gemini-2.5-flash". (${apiMsg})`);
+          }
+          console.error(`[DiagnoseDisease] API error — code=${code}, message=${apiMsg}`);
           throw new Error(`Gemini API error ${code}: ${apiMsg}`);
         }
-        
+
         break; // Success! Break out of the loop
       } catch (networkErr: any) {
+        console.error(`[DiagnoseDisease] Network error: ${networkErr.message}`);
         lastError = new Error(`Network error — could not reach Gemini API. Check your internet connection. (${networkErr.message})`);
       }
     }
 
     if (!response || !response.ok) {
+      console.error('[DiagnoseDisease] All API keys exhausted or failed.');
       throw lastError || new Error('All Gemini API keys failed or were rate limited. Please try again later.');
     }
 
     // ── Parse response safely ────────────────────────────────────────────────
     let rawJson: any;
     try { rawJson = await response.json(); } catch {
+      console.error('[DiagnoseDisease] Failed to parse HTTP response body as JSON.');
       throw new Error('Received an unreadable response from Gemini. Please try again.');
     }
 
-    const candidate = rawJson?.candidates?.[0];
-    if (!candidate) {
-      const blockReason = rawJson?.promptFeedback?.blockReason;
-      if (blockReason) throw new Error(`Request blocked by Gemini safety filters (${blockReason}). Use a clear plant image.`);
+    // ── Defensive response validation ────────────────────────────────────────
+    // Validate each stage of the Gemini response structure before accessing it.
+    if (!rawJson) {
+      console.error('[DiagnoseDisease] Empty response — rawJson is null/undefined.');
       throw new Error('No diagnosis was returned by the AI. Please try a different image.');
     }
 
-    const rawText: string = candidate?.content?.parts?.[0]?.text ?? '';
-    if (!rawText.trim()) throw new Error('Gemini returned an empty response. Please upload a clearer image.');
+    if (!rawJson.candidates || !Array.isArray(rawJson.candidates)) {
+      const blockReason = rawJson?.promptFeedback?.blockReason;
+      if (blockReason) {
+        console.error(`[DiagnoseDisease] Missing candidates — blocked by safety filters: ${blockReason}`);
+        throw new Error(`Request blocked by Gemini safety filters (${blockReason}). Use a clear plant image.`);
+      }
+      console.error('[DiagnoseDisease] Missing candidates array in response.', JSON.stringify(rawJson).slice(0, 500));
+      throw new Error('No diagnosis was returned by the AI. Please try a different image.');
+    }
 
-    // Strip any accidental markdown fences
+    if (rawJson.candidates.length === 0) {
+      console.error('[DiagnoseDisease] Empty candidates array.');
+      throw new Error('No diagnosis was returned by the AI. Please try a different image.');
+    }
+
+    const candidate = rawJson.candidates[0];
+
+    // ── CHANGE 4: Detect truncated response before parsing ───────────────────
+    if (candidate.finishReason === 'MAX_TOKENS') {
+      console.error('[DiagnoseDisease] Response truncated — finishReason=MAX_TOKENS.', JSON.stringify(candidate.content?.parts?.[0]?.text ?? '').slice(0, 200));
+      throw new Error('The AI response was too long and got cut off. Please try again with a clearer image.');
+    }
+
+    if (!candidate.content) {
+      console.error('[DiagnoseDisease] Missing content in first candidate.', JSON.stringify(candidate).slice(0, 500));
+      throw new Error('No diagnosis was returned by the AI. Please try a different image.');
+    }
+
+    if (!candidate.content.parts || !Array.isArray(candidate.content.parts)) {
+      console.error('[DiagnoseDisease] Missing parts array in candidate content.');
+      throw new Error('No diagnosis was returned by the AI. Please try a different image.');
+    }
+
+    if (candidate.content.parts.length === 0) {
+      console.error('[DiagnoseDisease] Empty parts array in candidate content.');
+      throw new Error('No diagnosis was returned by the AI. Please try a different image.');
+    }
+
+    if (typeof candidate.content.parts[0].text !== 'string') {
+      console.error('[DiagnoseDisease] Missing or non-string text in parts[0].', typeof candidate.content.parts[0].text);
+      throw new Error('No diagnosis was returned by the AI. Please try a different image.');
+    }
+
+    const rawText: string = candidate.content.parts[0].text;
+    if (!rawText.trim()) {
+      console.error('[DiagnoseDisease] Text field is empty/whitespace-only.');
+      throw new Error('Gemini returned an empty response. Please upload a clearer image.');
+    }
+
+    // Strip any accidental markdown fences (preserved existing parser)
     const cleaned = rawText
       .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
 
     try {
       return JSON.parse(cleaned);
-    } catch {
+    } catch (parseErr) {
+      console.error('[DiagnoseDisease] Primary JSON.parse failed:', parseErr, '| Raw text (truncated):', cleaned.slice(0, 300));
       const match = cleaned.match(/\{[\s\S]*\}/);
-      if (match) { try { return JSON.parse(match[0]); } catch { /* fall through */ } }
+      if (match) {
+        try {
+          return JSON.parse(match[0]);
+        } catch (fallbackErr) {
+          console.error('[DiagnoseDisease] Fallback JSON extraction also failed:', fallbackErr);
+        }
+      }
       throw new Error('AI returned an unexpected format. Please try the diagnosis again.');
     }
   },

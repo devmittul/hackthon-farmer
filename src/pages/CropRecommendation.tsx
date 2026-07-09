@@ -19,7 +19,8 @@ export default function CropRecommendation() {
     setWeatherCache,
     farms,
     activeFarm,
-    activateFarm
+    activateFarm,
+    loadFarms
   } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CropResult | null>(null);
@@ -64,6 +65,13 @@ export default function CropRecommendation() {
       .then((data: any) => setFields(data || []))
       .catch((err) => console.error("Failed to load fields:", err));
   }, []);
+
+  // Load farms if empty (handles direct navigation/refresh)
+  useEffect(() => {
+    if (farms.length === 0) {
+      loadFarms().catch(console.error);
+    }
+  }, [farms.length, loadFarms]);
 
   // Sync selected farm state when activeFarm changes globally
   useEffect(() => {
@@ -225,7 +233,7 @@ export default function CropRecommendation() {
                     </div>
 
                     <div className="space-y-4">
-                      <Label className="text-sm font-semibold text-green-800 uppercase tracking-widest">Select Field Context <span className="text-green-600/70 font-normal normal-case">(Auto-fills Soil Parameters)</span></Label>
+                      <Label className="text-sm font-semibold text-green-800 uppercase tracking-widest">Select Field Context <span className="text-green-600/70 font-normal normal-case">(Auto-fills Soil Parameters if field sensor available)</span></Label>
                       <Select 
                         value={selectedFieldId} 
                         onValueChange={handleFieldChange}
@@ -236,9 +244,9 @@ export default function CropRecommendation() {
                         </SelectTrigger>
                         <SelectContent className="rounded-[20px] border-border">
                           <SelectItem value="">None (Manual entry)</SelectItem>
-                          {fields.filter(field => field.farm_id === selectedFarmId).map(f => (
+                          {fields.filter(field => field.farm_id === selectedFarmId).map((f, index) => (
                             <SelectItem key={f.field_id} value={f.field_id}>
-                              {f.name || f.fieldName || 'Unnamed Field'} ({f.current_crop || 'No crop'})
+                              {f.name || f.fieldName || 'Unnamed Field'} ({f.current_crop || 'No crop'}) {index === 0 ? '— 📡 Live Sensor Data' : ''}
                             </SelectItem>
                           ))}
                         </SelectContent>

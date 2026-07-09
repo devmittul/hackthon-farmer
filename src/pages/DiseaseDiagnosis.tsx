@@ -1,12 +1,14 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Stethoscope, UploadCloud, Camera, Mic, CheckCircle2, AlertTriangle, AlertOctagon, Scan, ShieldAlert, FileWarning, Leaf, Loader2 } from 'lucide-react';
+import { Stethoscope, UploadCloud, Camera, Mic, MicOff, CheckCircle2, AlertTriangle, AlertOctagon, Scan, ShieldAlert, FileWarning, Leaf, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/services/api';
 import { cn } from '@/lib/utils';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { useToast } from '@/hooks/use-toast';
 
 export default function DiseaseDiagnosis() {
   const [file, setFile] = useState<File | null>(null);
@@ -16,6 +18,132 @@ export default function DiseaseDiagnosis() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Voice Recognition ──────────────────────────────────────────────────────
+  const { toast } = useToast();
+  const speech = useSpeechRecognition();
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [voiceAnalyzing, setVoiceAnalyzing] = useState(false);
+  const [voiceResult, setVoiceResult] = useState<any>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceProgress, setVoiceProgress] = useState(0);
+  const voiceSubmittedRef = useRef(false);
+
+  // Show toast on speech errors
+  useEffect(() => {
+    if (speech.status === 'error' && speech.errorMessage) {
+      toast({ title: 'Voice Input Error', description: speech.errorMessage, variant: 'destructive' });
+    }
+  }, [speech.status, speech.errorMessage, toast]);
+
+  // Auto-submit when transcript is finalized after release
+  useEffect(() => {
+    if (speech.status === 'processing' && speech.transcript && !voiceSubmittedRef.current) {
+      voiceSubmittedRef.current = true;
+      setVoiceTranscript(speech.transcript);
+      // Trigger voice diagnosis
+      handleVoiceDiagnose(speech.transcript);
+      speech.reset();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speech.status, speech.transcript]);
+
+  const handleVoiceDiagnose = useCallback(async (text: string) => {
+    if (!text.trim() || voiceAnalyzing) return;
+    setVoiceAnalyzing(true);
+    setVoiceProgress(0);
+    setVoiceError(null);
+    setVoiceResult(null);
+
+    const interval = setInterval(() => {
+      setVoiceProgress(prev => prev >= 95 ? (clearInterval(interval), 95) : prev + 5);
+    }, 100);
+
+    try {
+      // Reuse the Gemini diagnosis with a text-only prompt
+      const apiKeysRaw = import.meta.env.VITE_GEMINI_API_KEY as string;
+      const model = (import.meta.env.VITE_GEMINI_MODEL as string) || 'gemini-2.5-flash';
+      if (!apiKeysRaw) throw new Error('VITE_GEMINI_API_KEY is not set.');
+      const apiKeys = apiKeysRaw.split(',').map(k => k.trim()).filter(Boolean);
+      if (apiKeys.length === 0) throw new Error('No valid Gemini API keys.');
+
+      let response: Response | null = null;
+      let lastError: Error | null = null;
+
+      for (const apiKey of apiKeys) {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        try {
+          response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: [
+                'A farmer describes their crop symptoms:',
+                `"${text}"`,
+                'Based on this description, diagnose the most likely crop disease.',
+                'Return a JSON object with these exact keys:',
+                '"disease" (string), "confidence" (number 0-100),',
+                '"severity" (exactly one of: "Low", "Medium", "High"),',
+                '"symptoms" (array of 3-5 strings), "causes" (array of 2-4 strings),',
+                '"treatment" (array of 3-5 actionable strings),',
+                '"prevention" (array of 3-5 strings).',
+              ].join(' ') }] }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 8192,
+                responseMimeType: 'application/json',
+                thinkingConfig: { thinkingBudget: 0 },
+              },
+            }),
+          });
+          if (response.ok) break;
+          const errBody = await response.json().catch(() => ({}));
+          const code = (errBody as any)?.error?.code || response.status;
+          if (code === 429 || code === 401 || code === 403 || code >= 500) {
+            lastError = new Error(`Gemini API error ${code}`);
+            continue;
+          }
+          throw new Error((errBody as any)?.error?.message || `API error ${code}`);
+        } catch (networkErr: any) {
+          lastError = networkErr;
+        }
+      }
+
+      if (!response || !response.ok) throw lastError || new Error('All API keys failed.');
+
+      const rawJson: any = await response.json();
+      const candidate = rawJson?.candidates?.[0];
+      if (!candidate?.content?.parts?.[0]?.text) throw new Error('No diagnosis returned.');
+      if (candidate.finishReason === 'MAX_TOKENS') throw new Error('Response truncated. Try again.');
+
+      const rawText: string = candidate.content.parts[0].text;
+      const cleaned = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+      let data;
+      try { data = JSON.parse(cleaned); } catch {
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (match) data = JSON.parse(match[0]);
+        else throw new Error('AI returned unexpected format.');
+      }
+
+      clearInterval(interval);
+      setVoiceProgress(100);
+      setTimeout(() => { setVoiceResult(data); setVoiceAnalyzing(false); }, 500);
+    } catch (err: any) {
+      clearInterval(interval);
+      setVoiceAnalyzing(false);
+      setVoiceError(err.message || 'Voice diagnosis failed.');
+    }
+  }, [voiceAnalyzing]);
+
+  const handleMicDown = useCallback(() => {
+    if (voiceAnalyzing || analyzing) return;
+    voiceSubmittedRef.current = false;
+    speech.start();
+  }, [voiceAnalyzing, analyzing, speech]);
+
+  const handleMicUp = useCallback(() => {
+    speech.stop();
+  }, [speech]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -190,19 +318,110 @@ export default function DiseaseDiagnosis() {
                 )}
               </TabsContent>
               
-              <TabsContent value="voice" className="pt-6">
-                <div className="border-2 border-dashed border-border rounded-[32px] p-16 flex flex-col items-center justify-center text-center bg-white min-h-[480px]">
-                  <div className="relative group">
-                    <div className="absolute inset-0 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-all" />
-                    <div className="w-28 h-28 rounded-full bg-white border border-border flex items-center justify-center mb-10 cursor-pointer relative z-10 shadow-[0_8px_30px_rgba(0,0,0,0.06)] group-hover:scale-105 transition-transform">
-                      <Mic className="h-12 w-12 text-primary" strokeWidth={1} />
+              <TabsContent value="voice" className="space-y-8">
+                <div className={cn(
+                  "border-2 border-dashed rounded-[32px] p-10 flex flex-col items-center justify-center text-center transition-all duration-300 min-h-[360px]",
+                  speech.status === 'listening' ? 'border-rose-300 bg-rose-50/30' : 'border-border bg-white',
+                  voiceAnalyzing && 'opacity-50 pointer-events-none'
+                )}>
+                  {!speech.isSupported ? (
+                    <div className="py-12 flex flex-col items-center gap-4">
+                      <div className="bg-muted p-5 rounded-full w-24 h-24 flex items-center justify-center">
+                        <MicOff className="h-10 w-10 text-muted-foreground" strokeWidth={1} />
+                      </div>
+                      <h3 className="text-xl font-semibold text-foreground">Voice Input Unavailable</h3>
+                      <p className="text-base text-muted-foreground font-light max-w-sm">Voice input is not supported on this device. Please use Chrome or Edge.</p>
                     </div>
-                  </div>
-                  <h3 className="text-3xl font-semibold text-foreground mb-4">Tap to Speak</h3>
-                  <p className="text-lg text-muted-foreground max-w-sm font-light leading-relaxed">
-                    Describe the symptoms you are seeing on your crops in your local language.
-                  </p>
+                  ) : (
+                    <>
+                      {/* Mic Button — Push to Talk */}
+                      <div className="relative mb-8">
+                        {speech.status === 'listening' && (
+                          <>
+                            <div className="absolute inset-0 bg-rose-400/20 rounded-full blur-2xl animate-pulse" />
+                            <div className="absolute -inset-4 border-2 border-rose-300/50 rounded-full animate-ping" style={{ animationDuration: '1.5s' }} />
+                          </>
+                        )}
+                        <button
+                          id="voice-mic-btn"
+                          type="button"
+                          aria-label={speech.status === 'listening' ? 'Release to stop recording' : 'Hold to speak'}
+                          role="button"
+                          disabled={voiceAnalyzing || analyzing}
+                          onMouseDown={handleMicDown}
+                          onMouseUp={handleMicUp}
+                          onMouseLeave={handleMicUp}
+                          onTouchStart={(e) => { e.preventDefault(); handleMicDown(); }}
+                          onTouchEnd={(e) => { e.preventDefault(); handleMicUp(); }}
+                          className={cn(
+                            'w-28 h-28 rounded-full flex items-center justify-center relative z-10 transition-all duration-200 select-none touch-none',
+                            speech.status === 'listening'
+                              ? 'bg-rose-500 shadow-[0_8px_40px_rgba(244,63,94,0.35)] scale-110'
+                              : 'bg-white border border-border shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:scale-105 active:scale-110',
+                            (voiceAnalyzing || analyzing) && 'opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <Mic
+                            className={cn(
+                              'h-12 w-12 transition-colors',
+                              speech.status === 'listening' ? 'text-white' : 'text-primary'
+                            )}
+                            strokeWidth={speech.status === 'listening' ? 2 : 1}
+                          />
+                        </button>
+                      </div>
+
+                      <h3 className="text-3xl font-semibold text-foreground mb-2">
+                        {speech.status === 'listening' ? 'Listening...' : speech.status === 'processing' ? 'Processing...' : 'Hold to Speak'}
+                      </h3>
+                      <p className="text-lg text-muted-foreground max-w-sm font-light leading-relaxed">
+                        {speech.status === 'listening'
+                          ? 'Release when you\'re done speaking.'
+                          : 'Describe the symptoms you see on your crops in your local language.'}
+                      </p>
+
+                      {/* Live transcript preview */}
+                      {(speech.interimTranscript || (speech.status === 'listening' && speech.transcript)) && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6 w-full max-w-md">
+                          <div className="bg-muted/30 border border-border/50 rounded-[20px] p-5 text-base text-foreground font-light italic">
+                            "{speech.transcript || ''}{speech.interimTranscript}"
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {/* Show finalized transcript */}
+                      {voiceTranscript && !speech.interimTranscript && speech.status !== 'listening' && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6 w-full max-w-md">
+                          <div className="bg-green-50 border border-green-200/50 rounded-[20px] p-5 text-base text-green-800 font-medium">
+                            "{voiceTranscript}"
+                          </div>
+                        </motion.div>
+                      )}
+                    </>
+                  )}
                 </div>
+
+                {/* Voice progress bar */}
+                <AnimatePresence>
+                  {voiceAnalyzing && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4 overflow-hidden">
+                      <div className="flex justify-between text-base font-medium text-muted-foreground">
+                        <span className="flex items-center gap-3"><Loader2 className="h-5 w-5 animate-spin text-primary" strokeWidth={1.5} /> Analyzing symptoms</span>
+                        <span className="font-mono">{voiceProgress}%</span>
+                      </div>
+                      <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
+                        <motion.div className="h-full bg-primary rounded-full" initial={{ width: 0 }} animate={{ width: `${voiceProgress}%` }} />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {voiceError && (
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 text-red-700 bg-red-50 p-4 rounded-[20px]">
+                    <AlertTriangle className="h-5 w-5 shrink-0" strokeWidth={1.5} />
+                    <span className="text-sm font-medium">{voiceError}</span>
+                  </motion.div>
+                )}
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -211,7 +430,7 @@ export default function DiseaseDiagnosis() {
         {/* Results Column */}
         <div className="h-full">
           <AnimatePresence mode="wait">
-            {!result ? (
+            {!(result || voiceResult) ? (
               <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
                 <Card className="h-full flex flex-col items-center justify-center text-center p-16 border-2 border-dashed border-border bg-transparent shadow-none rounded-[32px]">
                   <div className="bg-muted p-8 rounded-full mb-8">
@@ -223,10 +442,12 @@ export default function DiseaseDiagnosis() {
                   </p>
                 </Card>
               </motion.div>
-            ) : (
+            ) : (() => {
+              const displayResult = result || voiceResult;
+              return (
               <motion.div key="result" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="h-full">
                 <Card className="glass-card overflow-hidden relative h-full flex flex-col">
-                  <div className={`absolute top-0 left-0 w-full h-3 ${getSeverityColor(result.severity)}`} />
+                  <div className={`absolute top-0 left-0 w-full h-3 ${getSeverityColor(displayResult.severity)}`} />
                   
                   <CardHeader className="pb-8 relative z-10 px-8 pt-10">
                     <div className="flex justify-between items-start gap-6">
@@ -235,17 +456,17 @@ export default function DiseaseDiagnosis() {
                           Diagnostic Report
                         </div>
                         <CardTitle className="text-4xl font-semibold capitalize text-foreground mb-4">
-                          {result.disease}
+                          {displayResult.disease}
                         </CardTitle>
                         <div className="flex items-center gap-3 mt-4 bg-white border border-border px-4 py-2 rounded-full w-fit">
                           <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Severity:</span>
                           <span className="flex items-center gap-2 font-semibold uppercase tracking-widest text-sm text-foreground">
-                            {getSeverityIcon(result.severity)} {result.severity}
+                            {getSeverityIcon(displayResult.severity)} {displayResult.severity}
                           </span>
                         </div>
                       </div>
                       <div className="bg-white border border-border p-5 rounded-[24px] text-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] min-w-[100px]">
-                        <div className="text-4xl font-light text-foreground">{result.confidence}<span className="text-xl text-muted-foreground font-light">%</span></div>
+                        <div className="text-4xl font-light text-foreground">{displayResult.confidence}<span className="text-xl text-muted-foreground font-light">%</span></div>
                         <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-2">Match</div>
                       </div>
                     </div>
@@ -258,7 +479,7 @@ export default function DiseaseDiagnosis() {
                         <ShieldAlert className="h-5 w-5 text-orange-500" strokeWidth={1.5} /> Identified Symptoms
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {result.symptoms.map((s: string, i: number) => (
+                        {displayResult.symptoms.map((s: string, i: number) => (
                           <div key={i} className="bg-white border border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] p-5 rounded-[20px] text-base font-light text-foreground flex items-start gap-3">
                             <span className="text-orange-500 mt-1 shrink-0">•</span> {s}
                           </div>
@@ -272,7 +493,7 @@ export default function DiseaseDiagnosis() {
                         <CheckCircle2 className="h-5 w-5" strokeWidth={1.5} /> Recommended Protocol
                       </h4>
                       <ul className="space-y-4">
-                        {result.treatment.map((t: string, i: number) => (
+                        {displayResult.treatment.map((t: string, i: number) => (
                           <li key={i} className="text-base font-light text-foreground flex items-start gap-4 leading-relaxed">
                             <span className="text-green-600 mt-1 shrink-0 bg-green-100 p-1.5 rounded-full"><Leaf className="h-4 w-4" strokeWidth={1.5} /></span>
                             {t}
@@ -287,7 +508,7 @@ export default function DiseaseDiagnosis() {
                         <FileWarning className="h-5 w-5 text-blue-500" strokeWidth={1.5} /> Prevention Measures
                       </h4>
                       <ul className="space-y-4">
-                        {result.prevention.map((p: string, i: number) => (
+                        {displayResult.prevention.map((p: string, i: number) => (
                           <li key={i} className="text-base text-foreground font-light flex items-start gap-4 bg-white border border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] p-5 rounded-[20px]">
                             <span className="text-blue-500 mt-1 shrink-0">•</span>{p}
                           </li>
@@ -296,7 +517,7 @@ export default function DiseaseDiagnosis() {
                     </div>
                   </CardContent>
                   
-                  {result.severity.toLowerCase() === 'high' && (
+                  {displayResult.severity.toLowerCase() === 'high' && (
                     <div className="p-8 border-t border-border/50 bg-muted/20">
                       <Button className="w-full h-16 text-lg font-medium rounded-full bg-red-500 hover:bg-red-600 text-white shadow-[0_8px_30px_rgba(239,68,68,0.2)] border-0 active:scale-[0.98] transition-transform">
                         <AlertOctagon className="mr-3 h-6 w-6" strokeWidth={1.5} /> Contact Agronomy Expert Now
@@ -305,7 +526,8 @@ export default function DiseaseDiagnosis() {
                   )}
                 </Card>
               </motion.div>
-            )}
+              );
+            })()}
           </AnimatePresence>
         </div>
       </div>

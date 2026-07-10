@@ -31,17 +31,40 @@ def _init_gee() -> bool:
     if _gee_initialised:
         return True
 
+    import os
+    import subprocess
+    from pathlib import Path
+
     settings = get_settings()
     if not settings.gee_service_account or not settings.gee_key_file:
         logger.warning("GEE credentials not configured – satellite features disabled.")
         return False
+
+    key_path = str(Path(settings.gee_key_file).resolve())
+    
+    # --- TEMPORARY STARTUP LOGGING ---
+    print("\nPWD:")
+    print(os.getcwd())
+    print("\nExpected key:")
+    print(key_path)
+    print("\nExists:")
+    print(os.path.exists(key_path))
+    if os.path.exists(key_path):
+        print("\nSize:")
+        print(os.path.getsize(key_path))
+    print("\nFiles:")
+    try:
+        print(subprocess.check_output(["ls", "-la"]).decode())
+    except Exception as e:
+        print(f"ls failed: {e}")
+    # ---------------------------------
 
     try:
         import ee
 
         credentials = ee.ServiceAccountCredentials(
             settings.gee_service_account,
-            settings.gee_key_file,
+            key_path,
         )
         ee.Initialize(credentials)
         _gee_initialised = True

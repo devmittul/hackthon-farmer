@@ -301,7 +301,7 @@ export function DashboardLayout() {
 
               {/* Search Dropdown */}
               {isSearchFocused && searchQuery.trim() && (
-                <div 
+                <div
                   className="absolute top-12 left-0 right-0 bg-white border border-border/60 rounded-[28px] shadow-[0_20px_40px_rgba(0,0,0,0.08)] overflow-hidden z-50 p-2 mt-2 max-h-[320px] overflow-y-auto"
                 >
                   {searchResults.length > 0 ? (
@@ -318,8 +318,8 @@ export function DashboardLayout() {
                           onMouseEnter={() => setSelectedIndex(idx)}
                           className={cn(
                             "flex items-center gap-4 px-4 py-3 cursor-pointer rounded-2xl transition-all duration-200 border",
-                            isSelected 
-                              ? "bg-green-50/90 border-green-100/80 text-green-800 shadow-[0_4px_12px_rgba(34,197,94,0.04)]" 
+                            isSelected
+                              ? "bg-green-50/90 border-green-100/80 text-green-800 shadow-[0_4px_12px_rgba(34,197,94,0.04)]"
                               : "border-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground"
                           )}
                         >

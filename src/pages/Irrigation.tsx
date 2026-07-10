@@ -77,7 +77,7 @@ export default function Irrigation() {
 
   return (
     <div className="flex flex-col gap-10 w-full max-w-7xl mx-auto pb-20">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
         className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pt-6"
       >
@@ -111,7 +111,7 @@ export default function Irrigation() {
             >
               <Navigation className="h-5 w-5 mr-2 text-primary" strokeWidth={1.5} /> GPS
             </Button>
-            <Button 
+            <Button
               className="h-14 px-8 bg-foreground hover:bg-foreground/90 text-background rounded-full font-medium text-base shadow-[0_8px_30px_rgba(0,0,0,0.12)] active:scale-[0.98] transition-transform"
               onClick={() => { setLocation(inputLocation); fetchData(inputLocation, true); }}
             >
@@ -270,7 +270,7 @@ export default function Irrigation() {
                     <div className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-6 flex items-center gap-2">
                       <Sparkles className="h-4 w-4" strokeWidth={1.5} /> Detailed AI Strategy
                     </div>
-                    
+
                     <div className="flex-1 overflow-y-auto max-h-[300px] pr-4 custom-scrollbar">
                       {advisoryLoading ? (
                         <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">

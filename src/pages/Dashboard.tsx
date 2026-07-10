@@ -17,14 +17,14 @@ const WEATHER_TTL_MS = 15 * 60 * 1000;
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { 
-    user, 
-    activeLocation, 
-    weatherCache, 
-    weatherCachedAt, 
-    setActiveLocation, 
-    setWeatherCache, 
-    activeFarm, 
+  const {
+    user,
+    activeLocation,
+    weatherCache,
+    weatherCachedAt,
+    setActiveLocation,
+    setWeatherCache,
+    activeFarm,
     language,
     farms,
     loadFarms,
@@ -94,7 +94,7 @@ export default function Dashboard() {
               setActiveLocation(fullLoc);
             }
           })
-          .catch(() => {});
+          .catch(() => { });
       }
     }
 
@@ -107,7 +107,7 @@ export default function Dashboard() {
 
     // Load farms for chat context
     loadFarms().catch((err) => console.error("Failed to load farms for chat context:", err));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLocation, lastRefreshedAt]);
 
   // Sync selected farm ID when activeFarm changes — only if not already set
@@ -239,7 +239,7 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col gap-10 w-full max-w-[1600px] mx-auto pb-20">
       {/* Header */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
         className="flex flex-col gap-3"
       >
@@ -254,7 +254,7 @@ export default function Dashboard() {
 
       {/* 12-Column Responsive Grid */}
       <div className="grid grid-cols-1 md:grid-cols-8 xl:grid-cols-12 gap-8">
-        
+
         {/* ROW 1 */}
         {/* Weather Card (6 cols) */}
         <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }} className="md:col-span-8 xl:col-span-6">
@@ -341,7 +341,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
-                <Button 
+                <Button
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-full h-11"
                   onClick={() => {
                     window.location.href = 'tel:1962';
@@ -349,7 +349,7 @@ export default function Dashboard() {
                 >
                   Call Center
                 </Button>
-                <Button 
+                <Button
                   variant="outline"
                   className="flex-1 rounded-full h-11 text-green-700 border-green-600 hover:bg-green-50 bg-white"
                   onClick={() => setShowHelpModal(true)}
@@ -406,9 +406,9 @@ export default function Dashboard() {
               { title: 'Field Activity', desc: 'Timeline of spraying and harvesting events.', icon: Clock, href: '/dashboard/reports', color: 'bg-indigo-100 text-indigo-700' },
               { title: 'Weather Alerts', desc: 'Severe anomaly detection for crops.', icon: AlertTriangle, href: '/dashboard/irrigation', color: 'bg-rose-100 text-rose-700' },
             ].map((service, i) => (
-              <motion.div 
-                key={i} 
-                whileHover={{ y: -5 }} 
+              <motion.div
+                key={i}
+                whileHover={{ y: -5 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                 onClick={() => navigate(service.href)}
                 className="cursor-pointer"
@@ -527,11 +527,10 @@ export default function Dashboard() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     className={`flex flex-col gap-1 ${m.role === 'user' ? 'items-end' : 'items-start'}`}
                   >
-                    <div className={`max-w-[85%] px-5 py-4 rounded-[24px] text-sm leading-relaxed shadow-sm relative group ${
-                      m.role === 'user'
+                    <div className={`max-w-[85%] px-5 py-4 rounded-[24px] text-sm leading-relaxed shadow-sm relative group ${m.role === 'user'
                         ? 'bg-green-600 text-white rounded-br-sm'
                         : 'bg-slate-50 text-slate-900 border border-slate-100 rounded-bl-sm'
-                    }`}>
+                      }`}>
                       {m.role === 'ai' && m.intent && (
                         <div className="text-[10px] text-green-700 mb-3 font-mono uppercase tracking-widest font-bold bg-green-100 w-fit px-2 py-0.5 rounded-full">
                           {m.intent}

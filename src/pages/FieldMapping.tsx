@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Map as MapIcon, Globe, MapPin, Navigation, Trash2, Save, 
+import {
+  Map as MapIcon, Globe, MapPin, Navigation, Trash2, Save,
   Search, Plus, Sparkles, ChevronRight, Check, X, ShieldAlert, HelpCircle,
   Download, Star, Edit, ShieldCheck
 } from 'lucide-react';
@@ -27,11 +27,11 @@ const DEFAULT_CENTER = { lat: 21.1458, lng: 79.0882 };
 
 export default function FieldMapping() {
   const { toast } = useToast();
-  const { 
-    farms, 
-    activeFarm, 
-    farmsLoading, 
-    loadFarms, 
+  const {
+    farms,
+    activeFarm,
+    farmsLoading,
+    loadFarms,
     activateFarm,
     activeLocation,
     setActiveLocation
@@ -160,7 +160,7 @@ export default function FieldMapping() {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setSearchQuery(val);
-    
+
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
@@ -206,7 +206,7 @@ export default function FieldMapping() {
   // Map Initialization & Event Listeners
   const onMapLoad = (evt: any) => {
     const map = evt.target;
-    
+
     // Instantiate MapboxDraw without default UI buttons to keep custom premium UI controls
     const draw = new MapboxDraw({
       displayControlsDefault: false,
@@ -216,7 +216,7 @@ export default function FieldMapping() {
       },
       defaultMode: 'simple_select'
     });
-    
+
     map.addControl(draw);
     drawRef.current = draw;
 
@@ -302,7 +302,7 @@ export default function FieldMapping() {
         name: farmName,
         boundary: drawnPolygon
       });
-      
+
       toast({
         title: "Farm registered",
         description: `Farm "${res.name}" has been mapped and geocoded successfully.`
@@ -323,7 +323,7 @@ export default function FieldMapping() {
       await loadFarms();
       if (res) {
         setSelectedFarmId(res.farm_id);
-        activateFarm(res.farm_id).catch(() => {});
+        activateFarm(res.farm_id).catch(() => { });
       }
     } catch (err: any) {
       toast({
@@ -339,19 +339,19 @@ export default function FieldMapping() {
   // Delete a farm boundary
   const handleDeleteFarm = async (farmId: string) => {
     if (!confirm("Are you sure you want to permanently delete this farm mapping?")) return;
-    
+
     try {
       await farmApi.delete(farmId);
       toast({
         title: "Farm deleted",
         description: "The farm registry has been deleted."
       });
-      
+
       if (selectedFarmId === farmId) {
         setSelectedFarmId(null);
         setSelectedFarm(null);
       }
-      
+
       await loadFarms();
     } catch (err: any) {
       toast({
@@ -383,7 +383,7 @@ export default function FieldMapping() {
   const selectFarm = (farm: Farm) => {
     setSelectedFarmId(farm.farm_id);
     setSelectedFarm(farm);
-    activateFarm(farm.farm_id).catch(() => {});
+    activateFarm(farm.farm_id).catch(() => { });
 
     if (mapRef.current) {
       if (farm.boundary) {
@@ -541,13 +541,13 @@ export default function FieldMapping() {
   };
 
   // Retrieve Mapbox Map Style URL
-  const mapStyleUrl = mapStyle === 'satellite' 
+  const mapStyleUrl = mapStyle === 'satellite'
     ? 'mapbox://styles/mapbox/satellite-streets-v12'
     : 'mapbox://styles/mapbox/outdoors-v12';
 
   return (
     <div className="flex flex-col gap-8 w-full max-w-[1600px] mx-auto pb-20">
-      
+
       {/* Header Panel */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div>
@@ -617,11 +617,11 @@ export default function FieldMapping() {
 
       {/* Main Content Layout */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-        
+
         {/* LEFT COLUMN: Map Canvas & Toolbar */}
         <div className="xl:col-span-8 flex flex-col gap-6">
           <Card className="border-0 shadow-lg bg-white rounded-[32px] overflow-hidden relative">
-            
+
             {/* Map Canvas */}
             <div className="relative h-[600px] w-full bg-slate-100">
               <Map
@@ -639,9 +639,9 @@ export default function FieldMapping() {
               >
                 {/* Navigation and Geolocate Controls */}
                 <NavigationControl position="bottom-right" />
-                <GeolocateControl 
-                  position="bottom-right" 
-                  trackUserLocation={true} 
+                <GeolocateControl
+                  position="bottom-right"
+                  trackUserLocation={true}
                   showUserLocation={true}
                   positionOptions={{ enableHighAccuracy: true }}
                   onGeolocate={async (e: any) => {
@@ -736,7 +736,7 @@ export default function FieldMapping() {
 
               {/* Floating Map Custom Toolbar */}
               <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
-                
+
                 {/* View Style Switcher */}
                 <div className="bg-white/90 backdrop-blur border border-slate-200/80 p-1.5 rounded-full shadow-lg flex gap-1 items-center">
                   <button
@@ -801,9 +801,9 @@ export default function FieldMapping() {
           {/* Real-time Turf calculated Area Stats Card */}
           <AnimatePresence>
             {calculatedArea && (
-              <motion.div 
-                initial={{ opacity: 0, y: 15 }} 
-                animate={{ opacity: 1, y: 0 }} 
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 15 }}
               >
                 <Card className="border-0 shadow-md bg-white rounded-[24px]">
@@ -837,7 +837,7 @@ export default function FieldMapping() {
 
         {/* RIGHT COLUMN: Farm Registry Details Panel */}
         <div className="xl:col-span-4 flex flex-col gap-6">
-          
+
           {/* Selected Farm Details */}
           {selectedFarm ? (
             <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}>
@@ -868,20 +868,20 @@ export default function FieldMapping() {
                       </CardDescription>
                     )}
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => {
                       setSelectedFarmId(null);
                       setSelectedFarm(null);
-                    }} 
+                    }}
                     className="rounded-full h-8 w-8 hover:bg-slate-100"
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 </CardHeader>
                 <CardContent className="space-y-6 relative z-10">
-                  
+
                   {/* Address Meta Card */}
                   {(selectedFarm.district || selectedFarm.state) && (
                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100/80 text-xs text-slate-600 font-light space-y-1.5">
@@ -939,18 +939,18 @@ export default function FieldMapping() {
                   {/* Actions toolbar */}
                   <div className="flex flex-col gap-3">
 
-                    
+
                     {selectedFarm.boundary && (
                       <div className="grid grid-cols-2 gap-3">
-                        <Button 
-                          asChild 
+                        <Button
+                          asChild
                           className="bg-slate-900 hover:bg-slate-800 text-white rounded-full h-12 font-semibold"
                         >
                           <Link to={`/dashboard/satellite-analysis?field_id=${selectedFarm.farm_id}`}>
                             GEE Analytics <Sparkles className="ml-2 h-4 w-4 text-green-400" />
                           </Link>
                         </Button>
-                        <Button 
+                        <Button
                           variant="outline"
                           onClick={() => handleExportGeoJson(selectedFarm)}
                           className="rounded-full border-slate-200 text-slate-700 hover:bg-slate-50 h-12 font-semibold"
@@ -960,8 +960,8 @@ export default function FieldMapping() {
                       </div>
                     )}
 
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => handleDeleteFarm(selectedFarm.farm_id)}
                       className="w-full rounded-full border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 h-12 font-semibold"
                     >
@@ -997,14 +997,14 @@ export default function FieldMapping() {
                   </div>
                 ) : farms.length === 0 ? (
                   <div className="py-16 text-center text-muted-foreground font-light text-sm px-6">
-                    No farm boundaries registered yet.<br/>Click <strong>Map Farm Boundary</strong> to define your first border.
+                    No farm boundaries registered yet.<br />Click <strong>Map Farm Boundary</strong> to define your first border.
                   </div>
                 ) : (
                   farms.map(f => {
                     const isSelected = selectedFarmId === f.farm_id;
                     return (
-                      <div 
-                        key={f.farm_id} 
+                      <div
+                        key={f.farm_id}
                         onClick={() => selectFarm(f)}
                         className={`flex items-center justify-between p-5 cursor-pointer transition-all hover:bg-slate-50/80 ${isSelected ? 'bg-green-50/40 border-l-4 border-green-600' : ''}`}
                       >
@@ -1037,9 +1037,9 @@ export default function FieldMapping() {
       <AnimatePresence>
         {showSaveDialog && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }} 
-              animate={{ scale: 1, opacity: 1 }} 
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white rounded-[32px] shadow-xl w-full max-w-md overflow-hidden"
             >
@@ -1048,10 +1048,10 @@ export default function FieldMapping() {
                   <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                     <Save className="h-5 w-5 text-green-600" /> Save Mapped Farm
                   </h3>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={cancelDrawing} 
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={cancelDrawing}
                     className="rounded-full h-8 w-8 hover:bg-slate-100"
                   >
                     <X className="h-4 w-4" />
@@ -1061,11 +1061,11 @@ export default function FieldMapping() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="farm-name">Farm Registry Name</Label>
-                    <Input 
-                      id="farm-name" 
-                      value={farmName} 
-                      onChange={(e) => setFarmName(e.target.value)} 
-                      placeholder="e.g. Western Harvest Acres" 
+                    <Input
+                      id="farm-name"
+                      value={farmName}
+                      onChange={(e) => setFarmName(e.target.value)}
+                      placeholder="e.g. Western Harvest Acres"
                       className="rounded-xl border-slate-200 focus-visible:ring-green-500"
                     />
                     <p className="text-[10px] text-muted-foreground font-light">
@@ -1082,15 +1082,15 @@ export default function FieldMapping() {
                 )}
 
                 <div className="flex gap-4">
-                  <Button 
-                    onClick={cancelDrawing} 
-                    variant="ghost" 
+                  <Button
+                    onClick={cancelDrawing}
+                    variant="ghost"
                     className="flex-1 rounded-full border border-slate-200 h-12 font-semibold"
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    onClick={handleSaveFarm} 
+                  <Button
+                    onClick={handleSaveFarm}
                     disabled={savingFarm || !farmName.trim()}
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-full h-12 font-semibold"
                   >

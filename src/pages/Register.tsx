@@ -40,14 +40,14 @@ export default function Register() {
       {/* Left side - Branding / Illustration */}
       <div className="hidden lg:flex lg:w-[40%] relative overflow-hidden bg-primary/10 flex-col justify-between p-16">
         <div className="absolute inset-0 z-0">
-          <img 
-            src="https://images.unsplash.com/photo-1625246333195-78d9c38ad449?q=80&w=2070" 
-            alt="Farming" 
+          <img
+            src="https://images.unsplash.com/photo-1625246333195-78d9c38ad449?q=80&w=2070"
+            alt="Farming"
             className="w-full h-full object-cover opacity-10 mix-blend-multiply filter contrast-125 saturate-50"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-primary/20 via-primary/5 to-transparent" />
         </div>
-        
+
         <div className="relative z-10 flex items-center gap-3 font-semibold text-foreground">
           <div className="bg-white p-3 rounded-[24px] shadow-sm">
             <Sprout className="h-6 w-6 text-primary" strokeWidth={1.5} />
@@ -85,27 +85,27 @@ export default function Register() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
               <div className="md:col-span-2 space-y-3">
                 <Label htmlFor="name" className="text-sm font-medium text-foreground ml-1">Full Name</Label>
-                <Input 
-                  id="name" required value={form.name} onChange={e => set('name', e.target.value)} 
-                  placeholder="Ramesh Kumar" 
+                <Input
+                  id="name" required value={form.name} onChange={e => set('name', e.target.value)}
+                  placeholder="Ramesh Kumar"
                   className="h-14 rounded-full bg-white border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] focus-visible:ring-primary focus-visible:border-primary px-6 text-base"
                 />
               </div>
 
               <div className="space-y-3">
                 <Label htmlFor="reg-email" className="text-sm font-medium text-foreground ml-1">Email Address</Label>
-                <Input 
-                  id="reg-email" type="email" required value={form.email} onChange={e => set('email', e.target.value)} 
-                  placeholder="farmer@example.com" 
+                <Input
+                  id="reg-email" type="email" required value={form.email} onChange={e => set('email', e.target.value)}
+                  placeholder="farmer@example.com"
                   className="h-14 rounded-full bg-white border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] focus-visible:ring-primary focus-visible:border-primary px-6 text-base"
                 />
               </div>
 
               <div className="space-y-3">
                 <Label htmlFor="phone" className="text-sm font-medium text-foreground ml-1">Phone Number</Label>
-                <Input 
-                  id="phone" required value={form.phone} onChange={e => set('phone', e.target.value)} 
-                  placeholder="+91 9876543210" 
+                <Input
+                  id="phone" required value={form.phone} onChange={e => set('phone', e.target.value)}
+                  placeholder="+91 9876543210"
                   className="h-14 rounded-full bg-white border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] focus-visible:ring-primary focus-visible:border-primary px-6 text-base"
                 />
               </div>
@@ -119,9 +119,9 @@ export default function Register() {
                     placeholder="Min 8 chars, 1 uppercase, 1 number"
                     className="h-14 rounded-full bg-white border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] focus-visible:ring-primary focus-visible:border-primary px-6 pr-12 text-base"
                   />
-                  <button 
-                    type="button" 
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" 
+                  <button
+                    type="button"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     onClick={() => setShowPass(s => !s)}
                   >
                     {showPass ? <EyeOff className="h-5 w-5" strokeWidth={1.5} /> : <Eye className="h-5 w-5" strokeWidth={1.5} />}
@@ -132,31 +132,31 @@ export default function Register() {
               <div className="md:col-span-2 space-y-3">
                 <Label htmlFor="location" className="text-sm font-medium text-foreground ml-1">Location (optional)</Label>
                 <div className="flex gap-3">
-                  <Input 
-                    id="location" value={form.location} onChange={e => set('location', e.target.value)} 
-                    placeholder="Punjab, India" 
+                  <Input
+                    id="location" value={form.location} onChange={e => set('location', e.target.value)}
+                    placeholder="Punjab, India"
                     className="h-14 rounded-full bg-white border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] focus-visible:ring-primary focus-visible:border-primary px-6 text-base"
                   />
-                  <Button 
-                    type="button" variant="outline" size="sm" 
+                  <Button
+                    type="button" variant="outline" size="sm"
                     className="h-14 px-6 rounded-full border-border bg-white hover:bg-muted text-foreground transition-colors font-medium shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
                     onClick={() => {
-                    if (navigator.geolocation) {
-                      navigator.geolocation.getCurrentPosition(async (pos) => {
-                        const lat = pos.coords.latitude;
-                        const lon = pos.coords.longitude;
-                        try {
-                          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-                          const data = await res.json();
-                          const placeName = data.address.city || data.address.town || data.address.village || data.address.county || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-                          const stateName = data.address.state || '';
-                          set('location', stateName ? `${placeName}, ${stateName}` : placeName);
-                        } catch (e) {
-                          set('location', `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
-                        }
-                      });
-                    }
-                  }}>
+                      if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(async (pos) => {
+                          const lat = pos.coords.latitude;
+                          const lon = pos.coords.longitude;
+                          try {
+                            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                            const data = await res.json();
+                            const placeName = data.address.city || data.address.town || data.address.village || data.address.county || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+                            const stateName = data.address.state || '';
+                            set('location', stateName ? `${placeName}, ${stateName}` : placeName);
+                          } catch (e) {
+                            set('location', `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+                          }
+                        });
+                      }
+                    }}>
                     Sync
                   </Button>
                 </div>

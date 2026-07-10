@@ -73,7 +73,7 @@ class Settings(BaseSettings):
 
     # ── Google Earth Engine ───────────────────────────────────────────────────
     gee_service_account: str = Field(default="")
-    gee_key_file: str = Field(default="")
+    gee_key_file: str = Field(default="gee-service-key.json")
     
 
     # ── Rate Limiting ─────────────────────────────────────────────────────────

@@ -180,7 +180,7 @@ export const useAppStore = create<AppState>()(
         try {
           const updatedUser = await authApi.updateProfile(data);
           set({ user: updatedUser, isAuthenticated: true, authLoading: false });
-          
+
           // Also sync active location if updated
           if (updatedUser.location) {
             set({ activeLocation: updatedUser.location });

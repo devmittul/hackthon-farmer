@@ -11,11 +11,11 @@ import { cropApi, weatherApi, twinApi, type CropResult } from '@/services/api';
 import { useAppStore } from '@/store/useAppStore';
 
 export default function CropRecommendation() {
-  const { 
-    activeLocation, 
-    weatherCache, 
-    weatherCachedAt, 
-    setActiveLocation, 
+  const {
+    activeLocation,
+    weatherCache,
+    weatherCachedAt,
+    setActiveLocation,
     setWeatherCache,
     farms,
     activeFarm,
@@ -122,7 +122,7 @@ export default function CropRecommendation() {
 
     // Only use cache if the location is loosely matching (to avoid using old cache for new farm)
     const isSameLocation = weatherCache?.location?.toLowerCase().includes(activeLocation.split(',')[0].toLowerCase().trim());
-    
+
     if (weatherCache && cacheAge < WEATHER_TTL_MS && isSameLocation) {
       applyWeatherToForm(weatherCache);
     } else {
@@ -146,7 +146,7 @@ export default function CropRecommendation() {
         })
         .catch(() => { /* ignore */ });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLocation, weatherCachedAt]);
 
   const handleAnalyze = async (e: React.FormEvent) => {
@@ -185,7 +185,7 @@ export default function CropRecommendation() {
   return (
     <div className="flex flex-col gap-10 w-full max-w-7xl mx-auto pb-20">
       {/* Header */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
         className="flex items-center gap-5 mb-4 pt-6"
       >
@@ -200,7 +200,7 @@ export default function CropRecommendation() {
 
       <AnimatePresence mode="wait">
         {!result ? (
-          <motion.div 
+          <motion.div
             key="form"
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.3 }}
@@ -234,8 +234,8 @@ export default function CropRecommendation() {
 
                     <div className="space-y-4">
                       <Label className="text-sm font-semibold text-green-800 uppercase tracking-widest">Select Field Context <span className="text-green-600/70 font-normal normal-case">(Auto-fills Soil Parameters if field sensor available)</span></Label>
-                      <Select 
-                        value={selectedFieldId} 
+                      <Select
+                        value={selectedFieldId}
                         onValueChange={handleFieldChange}
                         disabled={!selectedFarmId}
                       >
@@ -434,7 +434,7 @@ export default function CropRecommendation() {
             </Card>
           </motion.div>
         ) : (
-          <motion.div 
+          <motion.div
             key="result"
             initial={{ opacity: 0, scale: 0.98, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
             className="space-y-10"

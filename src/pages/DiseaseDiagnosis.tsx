@@ -45,7 +45,7 @@ export default function DiseaseDiagnosis() {
       handleVoiceDiagnose(speech.transcript);
       speech.reset();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [speech.status, speech.transcript]);
 
   const handleVoiceDiagnose = useCallback(async (text: string) => {
@@ -77,17 +77,21 @@ export default function DiseaseDiagnosis() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: [
-                'A farmer describes their crop symptoms:',
-                `"${text}"`,
-                'Based on this description, diagnose the most likely crop disease.',
-                'Return a JSON object with these exact keys:',
-                '"disease" (string), "confidence" (number 0-100),',
-                '"severity" (exactly one of: "Low", "Medium", "High"),',
-                '"symptoms" (array of 3-5 strings), "causes" (array of 2-4 strings),',
-                '"treatment" (array of 3-5 actionable strings),',
-                '"prevention" (array of 3-5 strings).',
-              ].join(' ') }] }],
+              contents: [{
+                parts: [{
+                  text: [
+                    'A farmer describes their crop symptoms:',
+                    `"${text}"`,
+                    'Based on this description, diagnose the most likely crop disease.',
+                    'Return a JSON object with these exact keys:',
+                    '"disease" (string), "confidence" (number 0-100),',
+                    '"severity" (exactly one of: "Low", "Medium", "High"),',
+                    '"symptoms" (array of 3-5 strings), "causes" (array of 2-4 strings),',
+                    '"treatment" (array of 3-5 actionable strings),',
+                    '"prevention" (array of 3-5 strings).',
+                  ].join(' ')
+                }]
+              }],
               generationConfig: {
                 temperature: 0.2,
                 maxOutputTokens: 8192,
@@ -160,7 +164,7 @@ export default function DiseaseDiagnosis() {
     setAnalyzing(true);
     setProgress(0);
     setError(null);
-    
+
     // Simulate progress
     const interval = setInterval(() => {
       setProgress(prev => {
@@ -208,7 +212,7 @@ export default function DiseaseDiagnosis() {
   return (
     <div className="flex flex-col gap-10 w-full max-w-7xl mx-auto pb-20">
       {/* Header */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
         className="flex items-center gap-5 mb-4 pt-6"
       >
@@ -236,9 +240,9 @@ export default function DiseaseDiagnosis() {
                 <TabsTrigger value="image" className="rounded-full text-base font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Upload Image</TabsTrigger>
                 <TabsTrigger value="voice" className="rounded-full text-base font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Voice Assist</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="image" className="space-y-8">
-                <div 
+                <div
                   className={cn(
                     "border-2 border-dashed rounded-[32px] p-10 flex flex-col items-center justify-center text-center transition-all duration-300 min-h-[360px]",
                     previewUrl ? 'border-primary/30 bg-primary/5' : 'border-border bg-white hover:bg-muted/30',
@@ -247,14 +251,14 @@ export default function DiseaseDiagnosis() {
                   onClick={() => !analyzing && fileInputRef.current?.click()}
                   style={{ cursor: analyzing ? 'default' : 'pointer' }}
                 >
-                  <input 
-                    type="file" 
-                    className="hidden" 
-                    ref={fileInputRef} 
+                  <input
+                    type="file"
+                    className="hidden"
+                    ref={fileInputRef}
                     accept="image/*"
                     onChange={handleFileChange}
                   />
-                  
+
                   {previewUrl ? (
                     <div className="relative w-full aspect-[4/3] rounded-[24px] overflow-hidden mb-6 shadow-sm border border-border">
                       <img src={previewUrl} alt="Preview" className="object-cover w-full h-full hover:scale-105 transition-transform duration-700" />
@@ -273,7 +277,7 @@ export default function DiseaseDiagnosis() {
                       <p className="text-base text-muted-foreground font-light">Supports JPG, PNG or WEBP up to 5MB</p>
                     </div>
                   )}
-                  
+
                   <div className="flex gap-4 mt-4 w-full">
                     <Button variant="outline" type="button" className="flex-1 h-14 rounded-full border-transparent bg-muted/50 hover:bg-muted text-foreground font-medium text-base shadow-sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
                       <UploadCloud className="mr-2 h-5 w-5 text-primary" strokeWidth={1.5} /> Browse
@@ -284,14 +288,14 @@ export default function DiseaseDiagnosis() {
                   </div>
                 </div>
 
-                <Button 
-                  className="w-full h-16 text-lg rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-all active:scale-[0.98] bg-foreground hover:bg-foreground/90 text-background font-medium" 
+                <Button
+                  className="w-full h-16 text-lg rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-all active:scale-[0.98] bg-foreground hover:bg-foreground/90 text-background font-medium"
                   disabled={!file || analyzing}
                   onClick={handleAnalyze}
                 >
                   {analyzing ? 'Processing Analysis...' : 'Run Diagnostics'}
                 </Button>
-                
+
                 <AnimatePresence>
                   {analyzing && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4 overflow-hidden">
@@ -300,7 +304,7 @@ export default function DiseaseDiagnosis() {
                         <span className="font-mono">{progress}%</span>
                       </div>
                       <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
-                        <motion.div 
+                        <motion.div
                           className="h-full bg-primary rounded-full"
                           initial={{ width: 0 }}
                           animate={{ width: `${progress}%` }}
@@ -317,7 +321,7 @@ export default function DiseaseDiagnosis() {
                   </motion.div>
                 )}
               </TabsContent>
-              
+
               <TabsContent value="voice" className="space-y-8">
                 <div className={cn(
                   "border-2 border-dashed rounded-[32px] p-10 flex flex-col items-center justify-center text-center transition-all duration-300 min-h-[360px]",
@@ -445,87 +449,87 @@ export default function DiseaseDiagnosis() {
             ) : (() => {
               const displayResult = result || voiceResult;
               return (
-              <motion.div key="result" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="h-full">
-                <Card className="glass-card overflow-hidden relative h-full flex flex-col">
-                  <div className={`absolute top-0 left-0 w-full h-3 ${getSeverityColor(displayResult.severity)}`} />
-                  
-                  <CardHeader className="pb-8 relative z-10 px-8 pt-10">
-                    <div className="flex justify-between items-start gap-6">
-                      <div>
-                        <div className="inline-flex items-center rounded-full bg-muted px-4 py-1.5 text-xs font-semibold text-muted-foreground mb-6 uppercase tracking-widest">
-                          Diagnostic Report
-                        </div>
-                        <CardTitle className="text-4xl font-semibold capitalize text-foreground mb-4">
-                          {displayResult.disease}
-                        </CardTitle>
-                        <div className="flex items-center gap-3 mt-4 bg-white border border-border px-4 py-2 rounded-full w-fit">
-                          <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Severity:</span>
-                          <span className="flex items-center gap-2 font-semibold uppercase tracking-widest text-sm text-foreground">
-                            {getSeverityIcon(displayResult.severity)} {displayResult.severity}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="bg-white border border-border p-5 rounded-[24px] text-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] min-w-[100px]">
-                        <div className="text-4xl font-light text-foreground">{displayResult.confidence}<span className="text-xl text-muted-foreground font-light">%</span></div>
-                        <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-2">Match</div>
-                      </div>
-                    </div>
-                  </CardHeader>
+                <motion.div key="result" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="h-full">
+                  <Card className="glass-card overflow-hidden relative h-full flex flex-col">
+                    <div className={`absolute top-0 left-0 w-full h-3 ${getSeverityColor(displayResult.severity)}`} />
 
-                  <CardContent className="space-y-10 flex-1 overflow-y-auto custom-scrollbar px-8 pb-8">
-                    {/* Symptoms */}
-                    <div>
-                      <h4 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-5 flex items-center gap-3">
-                        <ShieldAlert className="h-5 w-5 text-orange-500" strokeWidth={1.5} /> Identified Symptoms
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {displayResult.symptoms.map((s: string, i: number) => (
-                          <div key={i} className="bg-white border border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] p-5 rounded-[20px] text-base font-light text-foreground flex items-start gap-3">
-                            <span className="text-orange-500 mt-1 shrink-0">•</span> {s}
+                    <CardHeader className="pb-8 relative z-10 px-8 pt-10">
+                      <div className="flex justify-between items-start gap-6">
+                        <div>
+                          <div className="inline-flex items-center rounded-full bg-muted px-4 py-1.5 text-xs font-semibold text-muted-foreground mb-6 uppercase tracking-widest">
+                            Diagnostic Report
                           </div>
-                        ))}
+                          <CardTitle className="text-4xl font-semibold capitalize text-foreground mb-4">
+                            {displayResult.disease}
+                          </CardTitle>
+                          <div className="flex items-center gap-3 mt-4 bg-white border border-border px-4 py-2 rounded-full w-fit">
+                            <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Severity:</span>
+                            <span className="flex items-center gap-2 font-semibold uppercase tracking-widest text-sm text-foreground">
+                              {getSeverityIcon(displayResult.severity)} {displayResult.severity}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="bg-white border border-border p-5 rounded-[24px] text-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] min-w-[100px]">
+                          <div className="text-4xl font-light text-foreground">{displayResult.confidence}<span className="text-xl text-muted-foreground font-light">%</span></div>
+                          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-2">Match</div>
+                        </div>
                       </div>
-                    </div>
-                    
-                    {/* Treatment */}
-                    <div className="bg-green-50/50 p-8 rounded-[24px] border border-transparent">
-                      <h4 className="text-sm font-semibold uppercase tracking-widest text-green-700 mb-6 flex items-center gap-3">
-                        <CheckCircle2 className="h-5 w-5" strokeWidth={1.5} /> Recommended Protocol
-                      </h4>
-                      <ul className="space-y-4">
-                        {displayResult.treatment.map((t: string, i: number) => (
-                          <li key={i} className="text-base font-light text-foreground flex items-start gap-4 leading-relaxed">
-                            <span className="text-green-600 mt-1 shrink-0 bg-green-100 p-1.5 rounded-full"><Leaf className="h-4 w-4" strokeWidth={1.5} /></span>
-                            {t}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    </CardHeader>
 
-                    {/* Prevention */}
-                    <div>
-                      <h4 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-5 flex items-center gap-3">
-                        <FileWarning className="h-5 w-5 text-blue-500" strokeWidth={1.5} /> Prevention Measures
-                      </h4>
-                      <ul className="space-y-4">
-                        {displayResult.prevention.map((p: string, i: number) => (
-                          <li key={i} className="text-base text-foreground font-light flex items-start gap-4 bg-white border border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] p-5 rounded-[20px]">
-                            <span className="text-blue-500 mt-1 shrink-0">•</span>{p}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </CardContent>
-                  
-                  {displayResult.severity.toLowerCase() === 'high' && (
-                    <div className="p-8 border-t border-border/50 bg-muted/20">
-                      <Button className="w-full h-16 text-lg font-medium rounded-full bg-red-500 hover:bg-red-600 text-white shadow-[0_8px_30px_rgba(239,68,68,0.2)] border-0 active:scale-[0.98] transition-transform">
-                        <AlertOctagon className="mr-3 h-6 w-6" strokeWidth={1.5} /> Contact Agronomy Expert Now
-                      </Button>
-                    </div>
-                  )}
-                </Card>
-              </motion.div>
+                    <CardContent className="space-y-10 flex-1 overflow-y-auto custom-scrollbar px-8 pb-8">
+                      {/* Symptoms */}
+                      <div>
+                        <h4 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-5 flex items-center gap-3">
+                          <ShieldAlert className="h-5 w-5 text-orange-500" strokeWidth={1.5} /> Identified Symptoms
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {displayResult.symptoms.map((s: string, i: number) => (
+                            <div key={i} className="bg-white border border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] p-5 rounded-[20px] text-base font-light text-foreground flex items-start gap-3">
+                              <span className="text-orange-500 mt-1 shrink-0">•</span> {s}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Treatment */}
+                      <div className="bg-green-50/50 p-8 rounded-[24px] border border-transparent">
+                        <h4 className="text-sm font-semibold uppercase tracking-widest text-green-700 mb-6 flex items-center gap-3">
+                          <CheckCircle2 className="h-5 w-5" strokeWidth={1.5} /> Recommended Protocol
+                        </h4>
+                        <ul className="space-y-4">
+                          {displayResult.treatment.map((t: string, i: number) => (
+                            <li key={i} className="text-base font-light text-foreground flex items-start gap-4 leading-relaxed">
+                              <span className="text-green-600 mt-1 shrink-0 bg-green-100 p-1.5 rounded-full"><Leaf className="h-4 w-4" strokeWidth={1.5} /></span>
+                              {t}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Prevention */}
+                      <div>
+                        <h4 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-5 flex items-center gap-3">
+                          <FileWarning className="h-5 w-5 text-blue-500" strokeWidth={1.5} /> Prevention Measures
+                        </h4>
+                        <ul className="space-y-4">
+                          {displayResult.prevention.map((p: string, i: number) => (
+                            <li key={i} className="text-base text-foreground font-light flex items-start gap-4 bg-white border border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] p-5 rounded-[20px]">
+                              <span className="text-blue-500 mt-1 shrink-0">•</span>{p}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </CardContent>
+
+                    {displayResult.severity.toLowerCase() === 'high' && (
+                      <div className="p-8 border-t border-border/50 bg-muted/20">
+                        <Button className="w-full h-16 text-lg font-medium rounded-full bg-red-500 hover:bg-red-600 text-white shadow-[0_8px_30px_rgba(239,68,68,0.2)] border-0 active:scale-[0.98] transition-transform">
+                          <AlertOctagon className="mr-3 h-6 w-6" strokeWidth={1.5} /> Contact Agronomy Expert Now
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
+                </motion.div>
               );
             })()}
           </AnimatePresence>

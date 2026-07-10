@@ -5,8 +5,12 @@ set -e
 # Write Google Earth Engine credentials to a file if provided via environment variable
 if [ -n "$GEE_JSON_CONTENT" ]; then
     echo "Writing GEE credentials to ${GEE_KEY_FILE:-gee-service-key.json}"
-    # Decode base64 JSON content
-    echo "$GEE_JSON_CONTENT" | base64 -d > "${GEE_KEY_FILE:-gee-service-key.json}"
+    # Check if content starts with '{' (Raw JSON) or is base64 encoded
+    if [[ "$GEE_JSON_CONTENT" == {* ]]; then
+        echo "$GEE_JSON_CONTENT" > "${GEE_KEY_FILE:-gee-service-key.json}"
+    else
+        echo "$GEE_JSON_CONTENT" | base64 -d > "${GEE_KEY_FILE:-gee-service-key.json}"
+    fi
     
     # Verify that the file exists before proceeding
     if [ ! -f "${GEE_KEY_FILE:-gee-service-key.json}" ]; then
